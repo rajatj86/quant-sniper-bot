@@ -379,24 +379,40 @@ HTML = """
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #0b0e14; color: #d4d4d4; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; }
-        .panel { background-color: #151a23; border: 1px solid #2a3241; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { background-color: #0b0e14; color: #c9d1d9; font-family: 'Inter', 'Consolas', monospace; font-size: 13px; }
+        .panel { background-color: #151a23; border: 1px solid #21262d; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .header-bar { border-bottom: 2px solid #2962ff; padding-bottom: 10px; margin-bottom: 20px; }
-        .text-up { color: #00ff88 !important; }
-        .text-down { color: #ff3366 !important; }
-        .text-warning { color: #ffc107 !important; }
-        .nav-tabs { border-bottom: 1px solid #2a3241; margin-bottom: 20px; }
+        .text-up { color: #00e676 !important; }
+        .text-down { color: #ff1744 !important; }
+        .nav-tabs { border-bottom: 1px solid #21262d; margin-bottom: 20px; }
         .nav-tabs .nav-link { color: #888; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 10px 20px; font-size: 15px; }
         .nav-tabs .nav-link:hover { color: #fff; border-color: transparent; }
         .nav-tabs .nav-link.active { color: #2962ff; background-color: transparent; border-bottom: 2px solid #2962ff; font-weight: bold; }
-        table { color: #d4d4d4 !important; background-color: transparent !important; }
-        tr { border-bottom: 1px solid #2a3241; }
-        th { color: #888; font-weight: normal; border-bottom: 1px solid #2a3241 !important; text-transform: uppercase; font-size: 12px; }
-        td { vertical-align: middle; }
-        .btn-ai { background: linear-gradient(45deg, #2962ff, #7c4dff); color: white; border: none; font-size: 11px; padding: 4px 10px; border-radius: 4px; font-weight: bold; }
+        
+        /* TABLE - no white borders */
+        table { color: #c9d1d9 !important; background-color: #151a23 !important; border-collapse: collapse !important; width: 100%; }
+        thead, tbody, tr, td, th { background-color: #151a23 !important; }
+        thead tr { border-bottom: 1px solid #21262d !important; }
+        tbody tr { border-bottom: 1px solid #161b22 !important; }
+        tbody tr:hover, tbody tr:hover td { background-color: #1c2333 !important; }
+        th { color: #6e7681 !important; font-weight: 600 !important; border: none !important; border-bottom: 1px solid #21262d !important; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; padding: 8px 6px !important; }
+        td { vertical-align: middle !important; border: none !important; padding: 8px 6px !important; color: #e6edf3 !important; }
+        
+        /* Color Classes */
+        .col-red { color: #ff4757 !important; font-weight: 600; }
+        .col-green { color: #00e676 !important; font-weight: 600; }
+        .col-yellow { color: #ffc107 !important; font-weight: 600; }
+        .col-blue { color: #60a5fa !important; font-weight: 600; }
+        .col-white { color: #ffffff !important; font-weight: 500; }
+        .col-muted { color: #6e7681 !important; font-size: 11px; }
+        
+        .btn-ai { background: linear-gradient(45deg, #2962ff, #7c4dff); color: white; border: none; font-size: 11px; padding: 4px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; }
         .btn-ai:hover { opacity: 0.8; color: white; }
-        .stat-box { border-right: 1px solid #2a3241; padding-right: 20px; }
-        .stat-value { font-size: 22px; font-weight: bold; color: #fff; }
+        .stat-box { border-right: 1px solid #21262d; padding-right: 20px; }
+        .stat-value { font-size: 22px; font-weight: bold; color: #fff; font-family: 'Inter', monospace; }
         
         #aiModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
         .ai-modal-content { background: #151a23; border: 1px solid #2962ff; border-radius: 8px; padding: 20px; width: 90%; max-width: 500px; color: #fff; box-shadow: 0 0 20px rgba(41, 98, 255, 0.2); }
@@ -468,14 +484,16 @@ HTML = """
                                         <th>SIDE</th>
                                         <th>ENTRY</th>
                                         <th>MARKET</th>
+                                        <th>MARGIN</th>
+                                        <th>LEVERAGE</th>
                                         <th>SL</th>
                                         <th>TP</th>
                                         <th>LIVE PNL</th>
-                                        <th>AI ANALYSIS</th>
+                                        <th>ACTIONS</th>
                                     </tr>
                                 </thead>
                                 <tbody id="activeTable">
-                                    <tr><td colspan="9" class="text-center text-muted py-3">Scanning for 75%+ probability setups...</td></tr>
+                                    <tr><td colspan="11" class="text-center text-muted py-3">🔍 Scanning for high-probability 5m setups...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -496,7 +514,7 @@ HTML = """
                                         <th>EXIT</th>
                                         <th>REASON</th>
                                         <th>FINAL PNL</th>
-                                        <th>AI ANALYSIS</th>
+                                        <th>ACTIONS</th>
                                     </tr>
                                 </thead>
                                 <tbody id="historyTable">
@@ -738,36 +756,44 @@ HTML = """
                 let pnlStr = (pnl >= 0 ? '+' : '') + pnl.toFixed(2);
                 
                 activeHtml += `<tr>
-                    <td>${t.time.split(' ')[1]}</td>
-                    <td><a href="javascript:void(0)" onclick="document.getElementById('tvSymbol').value='${t.symbol}'; changeChart(); var tab = new bootstrap.Tab(document.getElementById('research-tab')); tab.show();" class="text-decoration-none text-info fw-bold"><i class="fa-solid fa-chart-simple"></i> ${t.symbol}</a></td>
-                    <td class="${sideClass} fw-bold">${t.side}</td>
-                    <td>${t.entry.toFixed(4)}</td>
-                    <td class="text-white">${currPrice}</td>
-                    <td class="text-danger">${t.sl.toFixed(4)}</td>
-                    <td class="text-success">${t.tp.toFixed(4)}</td>
-                    <td class="${pnlClass} fw-bold">$${pnlStr}</td>
-                    <td><button class="btn-ai" onclick="analyzeTrade('${t.id}')"><i class="fa-solid fa-robot"></i> Ask AI</button></td>
+                    <td class="col-muted">${t.time.split(' ')[1]}</td>
+                    <td><a href="javascript:void(0)" onclick="document.getElementById('tvSymbol').value='${t.symbol}'; changeChart(); var tab = new bootstrap.Tab(document.getElementById('research-tab')); tab.show();" class="text-decoration-none col-blue fw-bold"><i class="fa-solid fa-chart-simple"></i> ${t.symbol}</a></td>
+                    <td class="${t.side === 'LONG' ? 'col-green' : 'col-red'} fw-bold">${t.side}</td>
+                    <td class="col-white">${t.entry.toFixed(4)}</td>
+                    <td class="col-white">${currPrice}</td>
+                    <td class="col-yellow">$${(t.margin || 15).toFixed(2)}</td>
+                    <td class="col-blue">${t.leverage || 10}x</td>
+                    <td class="col-red">${t.sl.toFixed(4)}</td>
+                    <td class="col-green">${t.tp.toFixed(4)}</td>
+                    <td class="${pnl >= 0 ? 'col-green' : 'col-red'} fw-bold">$${pnlStr}</td>
+                    <td>
+                        <button class="btn-ai" onclick="analyzeTrade('${t.id}')" style="margin-right: 4px;"><i class="fa-solid fa-robot"></i> AI</button>
+                        <button class="btn-ai" onclick="document.getElementById('tvSymbol').value='${t.symbol}'; changeChart(); var tab = new bootstrap.Tab(document.getElementById('research-tab')); tab.show();" style="background: linear-gradient(45deg, #00b0ff, #00e5ff);"><i class="fa-solid fa-chart-line"></i> Chart</button>
+                    </td>
                 </tr>`;
             }
             if(activeHtml) document.getElementById('activeTable').innerHTML = activeHtml;
-            else document.getElementById('activeTable').innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Scanning for strictly confirmed setups...</td></tr>';
+            else document.getElementById('activeTable').innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">🔍 Scanning for high-probability 5m setups...</td></tr>';
             
             // Update History
             let histHtml = '';
             data.history.forEach(t => {
                 globalTrades[t.id] = t;
-                let sideClass = t.side === 'LONG' ? 'text-up' : 'text-down';
-                let pnlClass = t.pnl >= 0 ? 'text-up' : 'text-down';
+                let pnlClass = t.pnl >= 0 ? 'col-green' : 'col-red';
                 let pnlStr = (t.pnl >= 0 ? '+' : '') + t.pnl.toFixed(2);
+                let reasonClass = t.reason === 'TAKE_PROFIT' ? 'col-green' : 'col-red';
                 histHtml += `<tr>
-                    <td>${t.exit_time.split(' ')[1]}</td>
-                    <td class="text-white fw-bold">${t.symbol}</td>
-                    <td class="${sideClass}">${t.side}</td>
-                    <td>${t.entry.toFixed(4)}</td>
-                    <td>${t.exit_price.toFixed(4)}</td>
-                    <td class="text-muted" style="font-size: 11px;">${t.reason}</td>
+                    <td class="col-muted">${t.exit_time.split(' ')[1]}</td>
+                    <td class="col-white fw-bold">${t.symbol}</td>
+                    <td class="${t.side === 'LONG' ? 'col-green' : 'col-red'}">${t.side}</td>
+                    <td class="col-white">${t.entry.toFixed(4)}</td>
+                    <td class="col-white">${t.exit_price.toFixed(4)}</td>
+                    <td class="${reasonClass} col-muted">${t.reason}</td>
                     <td class="${pnlClass} fw-bold">$${pnlStr}</td>
-                    <td><button class="btn-ai" onclick="analyzeTrade('${t.id}')"><i class="fa-solid fa-robot"></i> Learn</button></td>
+                    <td>
+                        <button class="btn-ai" onclick="analyzeTrade('${t.id}')" style="margin-right: 4px;"><i class="fa-solid fa-robot"></i> AI</button>
+                        <button class="btn-ai" onclick="document.getElementById('tvSymbol').value='${t.symbol}'; changeChart(); var tab = new bootstrap.Tab(document.getElementById('research-tab')); tab.show();" style="background: linear-gradient(45deg, #00b0ff, #00e5ff);"><i class="fa-solid fa-chart-line"></i> Chart</button>
+                    </td>
                 </tr>`;
             });
             if(histHtml) document.getElementById('historyTable').innerHTML = histHtml;
@@ -818,6 +844,10 @@ def analyze_coin():
     try:
         ticker = b_get('/fapi/v1/ticker/24hr', {'symbol': symbol})
         klines = b_get('/fapi/v1/klines', {'symbol': symbol, 'interval': '15m', 'limit': 100})
+        
+        if not ticker or not klines or 'lastPrice' not in ticker:
+            return jsonify({'analysis': f'❌ Error: {symbol} Binance Futures par nahi mila. Kripya check karein ki coin ka naam sahi hai ya nahi.', 'symbol': symbol})
+            
         price = float(ticker.get('lastPrice', 0))
         change_pct = float(ticker.get('priceChangePercent', 0))
         volume = float(ticker.get('quoteVolume', 0))
