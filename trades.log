@@ -1,0 +1,154 @@
+[2026-05-10 00:33:20] 🤖 BOT STARTED
+[2026-05-10 00:33:22] 
+--- CYCLE 1 ---
+[2026-05-10 00:33:22] ========================================
+[2026-05-10 00:33:22] 🔍 Scanning market...
+[2026-05-10 00:33:22] Balance: $0.00 USDT
+[2026-05-10 00:33:22] Insufficient balance: $0.00
+[2026-05-10 00:33:22] 💤 Sleeping 1800s...
+[2026-05-10 00:38:13] 🤖 BOT STARTED
+[2026-05-10 00:38:14] 
+--- CYCLE 1 ---
+[2026-05-10 00:38:14] ========================================
+[2026-05-10 00:38:14] 🔍 Scanning market...
+[2026-05-10 00:38:14] Balance: $0.00 USDT
+[2026-05-10 00:38:15]   INXUSDT @ 0.014863 (+54.3%)
+[2026-05-10 00:38:17] Gemini error INXUSDT: 'candidates'
+[2026-05-10 00:38:17]   QUSDT @ 0.016562 (+46.1%)
+[2026-05-10 00:38:18] Gemini error QUSDT: 'candidates'
+[2026-05-10 00:38:18]   BILLUSDT @ 0.11966 (+37.9%)
+[2026-05-10 00:38:19]   BILLUSDT: volume cooling (0.661x), skip
+[2026-05-10 00:38:19]   SAHARAUSDT @ 0.04055 (+35.1%)
+[2026-05-10 00:38:20] Gemini error SAHARAUSDT: 'candidates'
+[2026-05-10 00:38:20]   PTBUSDT @ 0.0010115 (+29.8%)
+[2026-05-10 00:38:20]   PTBUSDT: volume cooling (0.238x), skip
+[2026-05-10 00:38:20]   ZEREBROUSDT @ 0.049359 (+26.0%)
+[2026-05-10 00:38:21]   ZEREBROUSDT: volume cooling (0.667x), skip
+[2026-05-10 00:38:21]   MITOUSDT @ 0.07406 (+24.3%)
+[2026-05-10 00:38:22] Gemini error MITOUSDT: 'candidates'
+[2026-05-10 00:38:22]   RAVEUSDT @ 0.8741 (+23.9%)
+[2026-05-10 00:38:23] Gemini error RAVEUSDT: 'candidates'
+[2026-05-10 00:38:23]   BASUSDT @ 0.020311 (+22.4%)
+[2026-05-10 00:38:23]   BASUSDT: volume cooling (0.648x), skip
+[2026-05-10 00:38:23]   PLAYUSDT @ 0.10803 (+20.2%)
+[2026-05-10 00:38:24]   PLAYUSDT: volume cooling (0.367x), skip
+[2026-05-10 00:38:24]   DYMUSDT @ 0.02491 (+17.3%)
+[2026-05-10 00:38:24]   DYMUSDT: volume cooling (0.542x), skip
+[2026-05-10 00:38:24]   VVVUSDT @ 15.702 (+17.2%)
+[2026-05-10 00:38:25] Gemini error VVVUSDT: 'candidates'
+[2026-05-10 00:38:25]   BANANAUSDT @ 4.897 (+15.4%)
+[2026-05-10 00:38:26]   BANANAUSDT: volume cooling (0.37x), skip
+[2026-05-10 00:38:26]   CETUSUSDT @ 0.03407 (+15.3%)
+[2026-05-10 00:38:26]   CETUSUSDT: volume cooling (0.648x), skip
+[2026-05-10 00:38:26]   JASMYUSDT @ 0.007099 (+14.2%)
+[2026-05-10 00:38:28] Gemini error JASMYUSDT: 'candidates'
+[2026-05-10 00:38:28]   BROCCOLIF3BUSDT @ 0.005771 (+13.5%)
+[2026-05-10 00:38:28]   BROCCOLIF3BUSDT: volume cooling (0.399x), skip
+[2026-05-10 00:38:28]   HUSDT @ 0.20547 (+12.7%)
+[2026-05-10 00:38:29]   HUSDT: volume cooling (0.24x), skip
+[2026-05-10 00:38:29]   BSBUSDT @ 0.60112 (+12.1%)
+[2026-05-10 00:38:29]   BSBUSDT: volume cooling (0.363x), skip
+[2026-05-10 00:38:29]   PHBUSDT @ 0.1261 (+11.7%)
+[2026-05-10 00:38:31] Gemini error PHBUSDT: 'candidates'
+[2026-05-10 00:38:31]   ICPUSDT @ 3.558 (+10.9%)
+[2026-05-10 00:38:31]   ICPUSDT: volume cooling (0.718x), skip
+[2026-05-10 00:38:31] 💤 Sleeping 1800s...
+[2026-05-10 00:42:35] 🤖 BOT STARTED
+[2026-05-10 00:42:36] 
+--- CYCLE 1 ---
+[2026-05-10 00:42:36] ========================================
+[2026-05-10 00:42:36] 🔍 Scanning market...
+[2026-05-10 00:42:37] Balance: $0.00 USDT
+[2026-05-10 00:42:38]   INXUSDT @ 0.014942 (+55.2%)
+[2026-05-10 00:42:39] Gemini API issue for INXUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:42:39]   QUSDT @ 0.016612 (+45.9%)
+[2026-05-10 00:42:40] Gemini API issue for QUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:42:40]   BILLUSDT @ 0.11717 (+36.2%)
+[2026-05-10 00:42:41]   BILLUSDT: volume cooling (0.661x), skip
+[2026-05-10 00:42:41]   PTBUSDT @ 0.0010188 (+30.7%)
+[2026-05-10 00:42:41]   PTBUSDT: volume cooling (0.238x), skip
+[2026-05-10 00:42:41]   SAHARAUSDT @ 0.03967 (+29.9%)
+[2026-05-10 00:42:43] Gemini API issue for SAHARAUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:42:43]   RAVEUSDT @ 0.8889 (+26.6%)
+[2026-05-10 00:42:44] Gemini API issue for RAVEUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:42:44]   ZEREBROUSDT @ 0.049028 (+26.5%)
+[2026-05-10 00:42:44]   ZEREBROUSDT: volume cooling (0.667x), skip
+[2026-05-10 00:42:44]   MITOUSDT @ 0.07445 (+24.7%)
+[2026-05-10 00:42:45] Gemini API issue for MITOUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:42:45]   BASUSDT @ 0.020273 (+22.2%)
+[2026-05-10 00:42:46]   BASUSDT: volume cooling (0.648x), skip
+[2026-05-10 00:42:46]   PLAYUSDT @ 0.10773 (+18.8%)
+[2026-05-10 00:42:46]   PLAYUSDT: volume cooling (0.367x), skip
+[2026-05-10 00:42:46]   DYMUSDT @ 0.02491 (+17.3%)
+[2026-05-10 00:42:47]   DYMUSDT: volume cooling (0.542x), skip
+[2026-05-10 00:42:47]   VVVUSDT @ 15.627 (+16.8%)
+[2026-05-10 00:42:48] Gemini API issue for VVVUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:42:48]   CETUSUSDT @ 0.03413 (+16.3%)
+[2026-05-10 00:42:48]   CETUSUSDT: volume cooling (0.648x), skip
+[2026-05-10 00:42:48]   BANANAUSDT @ 4.928 (+16.1%)
+[2026-05-10 00:42:49]   BANANAUSDT: volume cooling (0.37x), skip
+[2026-05-10 00:42:49]   JASMYUSDT @ 0.007099 (+13.9%)
+[2026-05-10 00:42:50] Gemini API issue for JASMYUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:42:50]   BROCCOLIF3BUSDT @ 0.005771 (+13.4%)
+[2026-05-10 00:42:51]   BROCCOLIF3BUSDT: volume cooling (0.399x), skip
+[2026-05-10 00:42:51]   BSBUSDT @ 0.60134 (+12.7%)
+[2026-05-10 00:42:51]   BSBUSDT: volume cooling (0.363x), skip
+[2026-05-10 00:42:51]   HUSDT @ 0.20559 (+12.5%)
+[2026-05-10 00:42:52]   HUSDT: volume cooling (0.24x), skip
+[2026-05-10 00:42:52]   PHBUSDT @ 0.1265 (+11.8%)
+[2026-05-10 00:42:53] Gemini API issue for PHBUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:42:53]   ICPUSDT @ 3.552 (+10.9%)
+[2026-05-10 00:42:53]   ICPUSDT: volume cooling (0.718x), skip
+[2026-05-10 00:42:53] 💤 Sleeping 1800s...
+[2026-05-10 00:47:55] 🤖 BOT STARTED
+[2026-05-10 00:47:56] 
+--- CYCLE 1 ---
+[2026-05-10 00:47:56] ========================================
+[2026-05-10 00:47:56] 🔍 Scanning market...
+[2026-05-10 00:47:57] Balance: $0.00 USDT
+[2026-05-10 00:47:59] Gemini API issue for INXUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:48:01] Gemini API issue for QUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:48:03] Gemini API issue for MITOUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:48:04] Gemini API issue for SAHARAUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:48:06] Gemini API issue for RAVEUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:48:09] Gemini API issue for VVVUSDT: {'code': 404, 'message': 'models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}
+[2026-05-10 00:51:40] 🤖 BOT STARTED
+[2026-05-10 00:51:40] 
+--- CYCLE 1 ---
+[2026-05-10 00:51:40] ========================================
+[2026-05-10 00:51:40] 🔍 Scanning market...
+[2026-05-10 00:51:41] Balance: $0.00 USDT
+[2026-05-10 00:51:49] 🎯 AI SIGNAL DETECTED: INXUSDT -> LONG (HIGH)
+[2026-05-10 00:51:49]    Reason: Strong bullish momentum evidenced by a 54.43% 24h gain and a clear uptrend in the last 12 closes, with the price currently consolidating near the 12h high, suggesting continued buying pressure.
+[2026-05-10 00:51:50] ⚠️ Alert Sent for INXUSDT (No balance to trade)
+[2026-05-10 00:52:01] 🎯 AI SIGNAL DETECTED: QUSDT -> LONG (HIGH)
+[2026-05-10 00:52:01]    Reason: Strong 24h price surge of 33.65% and sustained upward trend across recent closes indicate significant bullish momentum.
+[2026-05-10 00:52:02] ⚠️ Alert Sent for QUSDT (No balance to trade)
+[2026-05-10 00:52:14] 🎯 AI SIGNAL DETECTED: MITOUSDT -> LONG (HIGH)
+[2026-05-10 00:52:14]    Reason: Strong 24h gain and consistent higher closes indicate robust bullish momentum, pushing towards the 12h high.
+[2026-05-10 00:52:23] ⚠️ Alert Sent for MITOUSDT (No balance to trade)
+[2026-05-10 00:52:24] 💤 Sleeping 1800s...
+[2026-05-10 01:08:03] 🤖 BOT STARTED
+[2026-05-10 01:08:04] 
+--- CYCLE 1 ---
+[2026-05-10 01:08:04] ========================================
+[2026-05-10 01:08:04] 🔍 Scanning market...
+[2026-05-10 01:08:05] Balance: $0.00 USDT
+[2026-05-10 01:08:14] 🎯 AI SIGNAL DETECTED: INXUSDT -> LONG (HIGH)
+[2026-05-10 01:08:14]    Reason: Explosive 24h surge of over 50% with sustained upward price action in the last 12 periods, indicating strong bullish momentum despite minor pullbacks.
+[2026-05-10 01:08:16] ⚠️ Alert Sent for INXUSDT (No balance to trade)
+[2026-05-10 01:08:26] 🎯 AI SIGNAL DETECTED: QUSDT -> LONG (HIGH)
+[2026-05-10 01:08:26]    Reason: Massive 24h pump (34.99%) confirms strong bullish momentum, with a clear uptrend evident across the last 12 closes despite a minor recent retracement.
+[2026-05-10 01:08:27] ⚠️ Alert Sent for QUSDT (No balance to trade)
+[2026-05-10 01:08:36] 🎯 AI SIGNAL DETECTED: SAHARAUSDT -> LONG (HIGH)
+[2026-05-10 01:08:36]    Reason: Strong bullish momentum confirmed by a 30.16% 24h surge and a consistent uptrend in the last 12 closes.
+[2026-05-10 01:08:38] ⚠️ Alert Sent for SAHARAUSDT (No balance to trade)
+[2026-05-10 01:08:39] 💤 Sleeping 1800s...
+[2026-05-10 14:51:38] 🤖 BOT STARTED
+[2026-05-10 14:51:39] 
+--- CYCLE 1 ---
+[2026-05-10 14:51:39] ========================================
+[2026-05-10 14:51:39] 🔍 Scanning market...
+[2026-05-10 14:51:40] Balance: $1.92 USDT
+[2026-05-10 14:51:40] Max trades open
+[2026-05-10 14:51:40] 💤 Sleeping 1800s...
