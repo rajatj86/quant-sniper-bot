@@ -1,21 +1,6 @@
 {
-    "wallet": 49.01540537525938,
+    "wallet": 43.35254321547009,
     "active": {
-        "RONINUSDT": {
-            "id": "TRD_1779202620_RONI",
-            "symbol": "RONINUSDT",
-            "side": "LONG",
-            "entry": 0.1139,
-            "sl": 0.111622,
-            "tp": 0.117317,
-            "margin": 15.0,
-            "leverage": 10,
-            "prob": 0,
-            "ai_reason": "[RSI_REVERSAL] RSI 34 bounce",
-            "time": "2026-05-19 20:27:00",
-            "curr_price": 0.1132,
-            "unrealized_pnl": -0.9218612818261714
-        },
         "BNBUSDT": {
             "id": "TRD_1779204996_BNBU",
             "symbol": "BNBUSDT",
@@ -28,8 +13,8 @@
             "prob": 0,
             "ai_reason": "[EMA_CROSS] EMA 9/21 LONG",
             "time": "2026-05-19 21:06:36",
-            "curr_price": 639.45,
-            "unrealized_pnl": -0.10314272765630207
+            "curr_price": 640.06,
+            "unrealized_pnl": 0.039850599321748836
         },
         "XAUUSDT": {
             "id": "TRD_1779205518_XAUU",
@@ -42,10 +27,46 @@
             "leverage": 10,
             "prob": 0,
             "ai_reason": "[EMA_CROSS] EMA 9/21 LONG",
-            "time": "2026-05-19 21:15:18"
+            "time": "2026-05-19 21:15:18",
+            "curr_price": 4500.0,
+            "unrealized_pnl": -0.18310953279325268
+        },
+        "XAGUSDT": {
+            "id": "TRD_1779215044_XAGU",
+            "symbol": "XAGUSDT",
+            "side": "SHORT",
+            "entry": 74.28,
+            "sl": 74.54714285714286,
+            "tp": 73.87928571428571,
+            "margin": 15.0,
+            "leverage": 10,
+            "prob": 0,
+            "ai_reason": "[VOL_BREAKOUT] Volume 3.6x spike",
+            "time": "2026-05-19 23:54:04",
+            "curr_price": 74.31,
+            "unrealized_pnl": -0.06058158319870989
         }
     },
     "history": [
+        {
+            "id": "TRD_1779202620_RONI",
+            "symbol": "RONINUSDT",
+            "side": "LONG",
+            "entry": 0.1139,
+            "sl": 0.111622,
+            "tp": 0.117317,
+            "margin": 15.0,
+            "leverage": 10,
+            "prob": 0,
+            "ai_reason": "[RSI_REVERSAL] RSI 34 bounce",
+            "time": "2026-05-19 20:27:00",
+            "curr_price": 0.1096,
+            "unrealized_pnl": -5.662862159789287,
+            "exit_price": 0.1096,
+            "pnl": -5.662862159789287,
+            "reason": "STOP_LOSS",
+            "exit_time": "2026-05-19 23:53:55"
+        },
         {
             "id": "TRD_1779202526_MUUS",
             "symbol": "MUUSDT",
@@ -218,6 +239,6 @@
             "exit_time": "2026-05-19 18:59:08"
         }
     ],
-    "daily_pnl": -0.9845946247406161,
-    "daily_reset_date": "2026-05-19"
+    "daily_pnl": 0.0,
+    "daily_reset_date": "2026-05-20"
 }

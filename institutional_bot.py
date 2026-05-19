@@ -361,25 +361,36 @@ def trade_manager():
                 
                 closed = False
                 reason = ""
+                exit_price = curr_price
+                
                 if pos['side'] == "LONG":
-                    if curr_price <= pos['sl']: closed = True; reason = "STOP_LOSS"
-                    elif curr_price >= pos['tp']: closed = True; reason = "TAKE_PROFIT"
+                    if curr_price <= pos['sl']: 
+                        closed = True; reason = "STOP_LOSS"; exit_price = pos['sl']
+                    elif curr_price >= pos['tp']: 
+                        closed = True; reason = "TAKE_PROFIT"; exit_price = pos['tp']
                 else:
-                    if curr_price >= pos['sl']: closed = True; reason = "STOP_LOSS"
-                    elif curr_price <= pos['tp']: closed = True; reason = "TAKE_PROFIT"
+                    if curr_price >= pos['sl']: 
+                        closed = True; reason = "STOP_LOSS"; exit_price = pos['sl']
+                    elif curr_price <= pos['tp']: 
+                        closed = True; reason = "TAKE_PROFIT"; exit_price = pos['tp']
                     
                 if closed:
-                    paper_wallet += unrealized_pnl
-                    daily_pnl += unrealized_pnl
-                    pos['exit_price'] = curr_price
-                    pos['pnl'] = unrealized_pnl
+                    # Recalculate exact PNL using the limit execution price (prevents massive fake slippage)
+                    final_diff = (exit_price - pos['entry']) / pos['entry']
+                    if pos['side'] == "SHORT": final_diff = -final_diff
+                    final_pnl = pos['margin'] * pos['leverage'] * final_diff
+                    
+                    paper_wallet += final_pnl
+                    daily_pnl += final_pnl
+                    pos['exit_price'] = exit_price
+                    pos['pnl'] = final_pnl
                     pos['reason'] = reason
                     pos['exit_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
                     trade_history.insert(0, pos)
                     del active_trades[sym]
                     save_data()
-                    print(f"TRADE CLOSED: {sym} | PNL: ${unrealized_pnl:.2f}")
+                    print(f"TRADE CLOSED: {sym} | PNL: ${final_pnl:.2f} | Reason: {reason}")
                     
         except Exception as e:
             print(f"Manager Error: {e}")
