@@ -1,7 +1,70 @@
 {
-    "wallet": 49.80636779867995,
-    "active": {},
+    "wallet": 46.372120620846786,
+    "active": {
+        "MUUSDT": {
+            "id": "TRD_1779202526_MUUS",
+            "symbol": "MUUSDT",
+            "side": "LONG",
+            "entry": 675.99,
+            "sl": 662.4702,
+            "tp": 696.2697000000001,
+            "margin": 15.0,
+            "leverage": 10,
+            "prob": 0,
+            "ai_reason": "[EMA_CROSS] EMA 9/21 LONG",
+            "time": "2026-05-19 20:25:26",
+            "curr_price": 677.04,
+            "unrealized_pnl": 0.23299161230194704
+        },
+        "OPENUSDT": {
+            "id": "TRD_1779202538_OPEN",
+            "symbol": "OPENUSDT",
+            "side": "SHORT",
+            "entry": 0.2061,
+            "sl": 0.20861428571428572,
+            "tp": 0.20232857142857144,
+            "margin": 15.0,
+            "leverage": 10,
+            "prob": 0,
+            "ai_reason": "[EMA_CROSS] EMA 9/21 SHORT",
+            "time": "2026-05-19 20:25:38",
+            "curr_price": 0.2058,
+            "unrealized_pnl": 0.21834061135370794
+        },
+        "RONINUSDT": {
+            "id": "TRD_1779202620_RONI",
+            "symbol": "RONINUSDT",
+            "side": "LONG",
+            "entry": 0.1139,
+            "sl": 0.111622,
+            "tp": 0.117317,
+            "margin": 15.0,
+            "leverage": 10,
+            "prob": 0,
+            "ai_reason": "[RSI_REVERSAL] RSI 34 bounce",
+            "time": "2026-05-19 20:27:00"
+        }
+    },
     "history": [
+        {
+            "id": "TRD_1779202576_LABU",
+            "symbol": "LABUSDT",
+            "side": "SHORT",
+            "entry": 4.0926,
+            "sl": 4.174452,
+            "tp": 3.969822,
+            "margin": 15.0,
+            "leverage": 10,
+            "prob": 0,
+            "ai_reason": "[VOL_BREAKOUT] Volume 2.9x spike",
+            "time": "2026-05-19 20:26:16",
+            "curr_price": 4.1863,
+            "unrealized_pnl": -3.434247177833167,
+            "exit_price": 4.1863,
+            "pnl": -3.434247177833167,
+            "reason": "STOP_LOSS",
+            "exit_time": "2026-05-19 20:26:52"
+        },
         {
             "id": "TRD_1779198166",
             "symbol": "APRUSDT",
@@ -117,6 +180,6 @@
             "exit_time": "2026-05-19 18:59:08"
         }
     ],
-    "daily_pnl": -0.19363220132003978,
+    "daily_pnl": -3.6278793791532067,
     "daily_reset_date": "2026-05-19"
 }

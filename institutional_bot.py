@@ -162,12 +162,39 @@ def detect_volume_breakout(klines):
     if bearish >= 3: return "SHORT"
     return None
 
+def calc_bollinger_bands(klines, period=20, std_dev=2):
+    if len(klines) < period: return 0, 0, 0
+    closes = [float(k[4]) for k in klines]
+    recent_closes = closes[-period:]
+    sma = sum(recent_closes) / period
+    variance = sum((x - sma) ** 2 for x in recent_closes) / period
+    std = variance ** 0.5
+    upper_band = sma + (std_dev * std)
+    lower_band = sma - (std_dev * std)
+    return upper_band, sma, lower_band
+
+def detect_bb_rsi_combo(klines, rsi_val):
+    if len(klines) < 20: return None
+    upper, sma, lower = calc_bollinger_bands(klines, 20, 2)
+    if upper == 0 and lower == 0: return None
+    
+    last_candle = klines[-2] # using previous closed candle for reliable signal
+    close = float(last_candle[4])
+    
+    # LONG: Price closes below lower band, RSI is oversold
+    if close < lower and rsi_val < 35:
+        return "LONG"
+    # SHORT: Price closes above upper band, RSI is overbought
+    if close > upper and rsi_val > 65:
+        return "SHORT"
+    return None
+
 # --- Scanner Thread (Multi-Strategy, Zero AI tokens) ---
 def market_scanner():
     global daily_pnl, daily_reset_date
     print("=" * 60)
-    print("🚀 MULTI-STRATEGY SCALPER v4.0 STARTED")
-    print("   Strategies: RSI Reversal | EMA Cross | Volume Breakout")
+    print("🚀 MULTI-STRATEGY SCALPER v4.1 STARTED")
+    print("   Strategies: RSI | EMA Cross | Volume | BB+RSI Combo")
     print("   Timeframe: 5m | Scan: 30s | Top 50 Volume Coins")
     print("=" * 60)
     scan_count = 0
@@ -231,6 +258,13 @@ def market_scanner():
                         direction = vol_sig
                         strategy = "VOL_BREAKOUT"
                         reason = f"Volume {calc_volume_spike(k_5m,20):.1f}x spike"
+                # STRATEGY 4: BB + RSI Combo
+                if not direction:
+                    bb_rsi_sig = detect_bb_rsi_combo(k_5m, rsi_val)
+                    if bb_rsi_sig:
+                        direction = bb_rsi_sig
+                        strategy = "BB_RSI_COMBO"
+                        reason = f"BB Breakout + RSI {rsi_val:.0f}"
                 if direction:
                     signals_found += 1
                     atr = calc_atr(k_5m)
