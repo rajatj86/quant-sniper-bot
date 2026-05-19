@@ -334,12 +334,24 @@ def trade_manager():
     global paper_wallet, daily_pnl
     while True:
         try:
-            for sym in list(active_trades.keys()):
-                pos = active_trades[sym]
-                ticker = b_get("/fapi/v1/ticker/price", {"symbol": sym})
-                if not ticker or 'price' not in ticker: continue
+            if not active_trades:
+                time.sleep(5)
+                continue
                 
-                curr_price = float(ticker['price'])
+            # Fetch all prices in one single call (Weight: 2) to avoid rate limits
+            tickers = b_get("/fapi/v1/ticker/price")
+            if not tickers or not isinstance(tickers, list):
+                time.sleep(5)
+                continue
+                
+            price_map = {t['symbol']: float(t['price']) for t in tickers if 'symbol' in t and 'price' in t}
+            
+            for sym in list(active_trades.keys()):
+                if sym not in price_map: continue
+                
+                pos = active_trades[sym]
+                curr_price = price_map[sym]
+                
                 diff = (curr_price - pos['entry']) / pos['entry']
                 if pos['side'] == "SHORT": diff = -diff
                 
