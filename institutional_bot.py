@@ -116,9 +116,9 @@ def detect_liquidity_sweep(klines):
     lower_wick = min(lc_open, lc_close) - lc_low
     upper_wick = lc_high - max(lc_open, lc_close)
     
-    if lc_low < major_support and lc_close > major_support and lower_wick > body:
+    if lc_low < major_support and lc_close > major_support and lower_wick > body * 1.5:
         return "LONG_SWEEP"
-    if lc_high > major_resistance and lc_close < major_resistance and upper_wick > body:
+    if lc_high > major_resistance and lc_close < major_resistance and upper_wick > body * 1.5:
         return "SHORT_SWEEP"
     return None
 
@@ -288,8 +288,8 @@ def market_scanner():
                     atr = calc_atr(k_5m)
                     
                     max_sl_pct = MAX_RISK_PER_TRADE / (MARGIN_PER_TRADE * DEFAULT_LEVERAGE)
-                    sl_dist = min(1.5 * atr, price * max_sl_pct)
-                    tp_dist = sl_dist * 1.5
+                    sl_dist = min(2.5 * atr, price * max_sl_pct)
+                    tp_dist = sl_dist * 1.2
                     
                     if direction == "LONG":
                         sl, tp = price - sl_dist, price + tp_dist
