@@ -81,96 +81,192 @@ def b_get(endpoint, params=None):
     except Exception as e:
         return []
 
-# --- Advanced Institutional Logic ---
+# --- Core Technical Indicators ---
 def calc_atr(klines, period=14):
-    if len(klines) < period: return 0
+    if len(klines) < period + 1: return 0
     trs = []
     for i in range(1, len(klines)):
         h, l, pc = float(klines[i][2]), float(klines[i][3]), float(klines[i-1][4])
         trs.append(max(h - l, abs(h - pc), abs(l - pc)))
     return sum(trs[-period:]) / period
 
+def calc_ema_values(closes, period):
+    if len(closes) < period: return []
+    multiplier = 2 / (period + 1)
+    ema = sum(closes[:period]) / period
+    emas = [ema]
+    for price in closes[period:]:
+        ema = (price - ema) * multiplier + ema
+        emas.append(ema)
+    return emas
+
 def calc_ema(klines, period=200):
     if len(klines) < period: return 0
     closes = [float(k[4]) for k in klines]
-    multiplier = 2 / (period + 1)
-    ema = sum(closes[:period]) / period
-    for price in closes[period:]:
-        ema = (price - ema) * multiplier + ema
-    return ema
+    vals = calc_ema_values(closes, period)
+    return vals[-1] if vals else 0
 
-def detect_liquidity_sweep(klines):
-    if len(klines) < 20: return None
-    # Look back 15 candles (1 hour 15 mins on 5m chart)
-    recent_lows = [float(k[3]) for k in klines[-15:-2]]
-    recent_highs = [float(k[2]) for k in klines[-15:-2]]
-    
-    major_support = min(recent_lows)
-    major_resistance = max(recent_highs)
-    
-    last_candle = klines[-2]
-    lc_low, lc_high, lc_close, lc_open = float(last_candle[3]), float(last_candle[2]), float(last_candle[4]), float(last_candle[1])
-    
-    # Check for strong rejection (long wick)
-    body = abs(lc_close - lc_open)
-    lower_wick = min(lc_open, lc_close) - lc_low
-    upper_wick = lc_high - max(lc_open, lc_close)
-    
-    if lc_low < major_support and lc_close > major_support and lower_wick > body * 1.5:
-        return "LONG_SWEEP"
-    if lc_high > major_resistance and lc_close < major_resistance and upper_wick > body * 1.5:
-        return "SHORT_SWEEP"
+def calc_rsi(klines, period=14):
+    if len(klines) < period + 2: return 50
+    closes = [float(k[4]) for k in klines]
+    gains, losses = [], []
+    for i in range(1, len(closes)):
+        diff = closes[i] - closes[i-1]
+        gains.append(max(diff, 0))
+        losses.append(max(-diff, 0))
+    if len(gains) < period: return 50
+    avg_gain = sum(gains[-period:]) / period
+    avg_loss = sum(losses[-period:]) / period
+    if avg_loss == 0: return 100
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+def calc_volume_spike(klines, lookback=20):
+    if len(klines) < lookback + 1: return 1.0
+    volumes = [float(k[5]) for k in klines]
+    avg_vol = sum(volumes[-(lookback+1):-1]) / lookback
+    curr_vol = volumes[-1]
+    if avg_vol == 0: return 1.0
+    return curr_vol / avg_vol
+
+def detect_ema_cross(klines):
+    closes = [float(k[4]) for k in klines]
+    if len(closes) < 22: return None
+    ema9 = calc_ema_values(closes, 9)
+    ema21 = calc_ema_values(closes, 21)
+    if len(ema9) < 3 or len(ema21) < 3: return None
+    offset = len(ema9) - len(ema21)
+    if offset < 0: return None
+    curr_9, prev_9 = ema9[-1], ema9[-2]
+    curr_21, prev_21 = ema21[-1], ema21[-2]
+    if prev_9 <= prev_21 and curr_9 > curr_21: return "LONG"
+    if prev_9 >= prev_21 and curr_9 < curr_21: return "SHORT"
     return None
 
-def calc_order_flow_delta(klines):
-    if len(klines) < 10: return 0
-    delta = 0
-    for k in klines[-10:]:
-        o, h, l, c, v = float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])
-        if h == l: continue
-        buying_pressure = (c - l) / (h - l)
-        selling_pressure = (h - c) / (h - l)
-        delta += (buying_pressure - selling_pressure) * v
-    return delta
+def detect_rsi_signal(klines):
+    rsi = calc_rsi(klines, 14)
+    rsi_prev = calc_rsi(klines[:-1], 14)
+    if rsi_prev < 30 and rsi >= 30: return "LONG", rsi
+    if rsi_prev > 70 and rsi <= 70: return "SHORT", rsi
+    return None, rsi
 
-def knn_probability(klines, pattern_length=10, lookforward=5, k=5):
-    if len(klines) < 100: return 0.0
-    closes = [float(candle[4]) for candle in klines]
-    curr_slice = closes[-pattern_length:]
-    curr_base = curr_slice[0]
-    if curr_base == 0: return 0.0
-    
-    curr_pattern = [(p - curr_base) / curr_base * 100 for p in curr_slice]
-    distances = []
-    
-    for i in range(len(closes) - pattern_length - lookforward - 1):
-        hist_slice = closes[i : i + pattern_length]
-        hist_base = hist_slice[0]
-        if hist_base == 0: continue
-        
-        hist_pattern = [(p - hist_base) / hist_base * 100 for p in hist_slice]
-        dist = sum((curr_pattern[j] - hist_pattern[j])**2 for j in range(pattern_length)) ** 0.5
-        
-        future_price = closes[i + pattern_length + lookforward]
-        end_of_pattern_price = closes[i + pattern_length - 1]
-        future_move_pct = (future_price - end_of_pattern_price) / end_of_pattern_price * 100
-        
-        distances.append((dist, future_move_pct))
-    
-    distances.sort(key=lambda x: x[0])
-    top_k = distances[:k]
-    if not top_k: return 0.0
-    avg_future_move = sum(match[1] for match in top_k) / k
-    if avg_future_move > 0:
-        return (sum(1 for match in top_k if match[1] > 0) / k) * 100
-    else:
-        return -(sum(1 for match in top_k if match[1] < 0) / k) * 100
+def detect_volume_breakout(klines):
+    if len(klines) < 25: return None
+    vol_ratio = calc_volume_spike(klines, 20)
+    if vol_ratio < 2.0: return None
+    closes = [float(k[4]) for k in klines[-4:]]
+    opens = [float(k[1]) for k in klines[-4:]]
+    bullish = sum(1 for i in range(len(closes)) if closes[i] > opens[i])
+    bearish = sum(1 for i in range(len(closes)) if closes[i] < opens[i])
+    if bullish >= 3: return "LONG"
+    if bearish >= 3: return "SHORT"
+    return None
+
+# --- Scanner Thread (Multi-Strategy, Zero AI tokens) ---
+def market_scanner():
+    global daily_pnl, daily_reset_date
+    print("=" * 60)
+    print("🚀 MULTI-STRATEGY SCALPER v4.0 STARTED")
+    print("   Strategies: RSI Reversal | EMA Cross | Volume Breakout")
+    print("   Timeframe: 5m | Scan: 30s | Top 50 Volume Coins")
+    print("=" * 60)
+    scan_count = 0
+    while True:
+        try:
+            if not bot_running:
+                time.sleep(5)
+                continue
+            today = datetime.now().strftime("%Y-%m-%d")
+            if today != daily_reset_date:
+                print(f"\n{'='*50}")
+                print(f"📅 NEW DAY: {today} | Yesterday PNL: ${daily_pnl:.2f}")
+                print(f"{'='*50}\n")
+                daily_pnl = 0.0
+                daily_reset_date = today
+                save_data()
+            if daily_pnl <= -DAILY_LOSS_LIMIT:
+                print(f"🛑 DAILY LOSS LIMIT (${daily_pnl:.2f}). Paused.")
+                time.sleep(300)
+                continue
+            if len(active_trades) >= MAX_CONCURRENT:
+                time.sleep(10)
+                continue
+            scan_count += 1
+            tickers = b_get("/fapi/v1/ticker/24hr")
+            if not tickers or not isinstance(tickers, list):
+                print(f"[Scan #{scan_count}] ⚠️ No Binance data. Retrying...")
+                time.sleep(10)
+                continue
+            valid_coins = [t for t in tickers if t.get("symbol","").endswith("USDT") and float(t.get("quoteVolume", 0)) > 30000000]
+            valid_coins.sort(key=lambda x: float(x.get("quoteVolume", 0)), reverse=True)
+            signals_found = 0
+            for t in valid_coins[:50]:
+                sym = t["symbol"]
+                if sym in active_trades: continue
+                if len(active_trades) >= MAX_CONCURRENT: break
+                k_5m = b_get("/fapi/v1/klines", {"symbol": sym, "interval": "5m", "limit": 100})
+                if not k_5m or not isinstance(k_5m, list) or len(k_5m) < 30: continue
+                price = float(k_5m[-1][4])
+                if price == 0: continue
+                direction = None
+                strategy = ""
+                reason = ""
+                # STRATEGY 1: RSI Reversal
+                rsi_sig, rsi_val = detect_rsi_signal(k_5m)
+                if rsi_sig:
+                    direction = rsi_sig
+                    strategy = "RSI_REVERSAL"
+                    reason = f"RSI {rsi_val:.0f} bounce"
+                # STRATEGY 2: EMA 9/21 Cross
+                if not direction:
+                    ema_sig = detect_ema_cross(k_5m)
+                    if ema_sig:
+                        direction = ema_sig
+                        strategy = "EMA_CROSS"
+                        reason = f"EMA 9/21 {ema_sig}"
+                # STRATEGY 3: Volume Breakout
+                if not direction:
+                    vol_sig = detect_volume_breakout(k_5m)
+                    if vol_sig:
+                        direction = vol_sig
+                        strategy = "VOL_BREAKOUT"
+                        reason = f"Volume {calc_volume_spike(k_5m,20):.1f}x spike"
+                if direction:
+                    signals_found += 1
+                    atr = calc_atr(k_5m)
+                    if atr == 0: continue
+                    max_sl_pct = MAX_RISK_PER_TRADE / (MARGIN_PER_TRADE * DEFAULT_LEVERAGE)
+                    sl_dist = min(2.0 * atr, price * max_sl_pct)
+                    tp_dist = sl_dist * 1.5
+                    if sl_dist == 0: continue
+                    if direction == "LONG":
+                        sl, tp = price - sl_dist, price + tp_dist
+                    else:
+                        sl, tp = price + sl_dist, price - tp_dist
+                    trade_id = f"TRD_{int(time.time())}_{sym[:4]}"
+                    active_trades[sym] = {
+                        "id": trade_id, "symbol": sym, "side": direction,
+                        "entry": price, "sl": sl, "tp": tp,
+                        "margin": MARGIN_PER_TRADE, "leverage": DEFAULT_LEVERAGE,
+                        "prob": 0, "ai_reason": f"[{strategy}] {reason}",
+                        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    save_data()
+                    print(f"🎯 ENTRY: {direction} {sym} @ {price:.4f} | {strategy} | {reason}")
+                live_radar[sym] = {"sweep": strategy or "SCANNING", "delta": 0, "prob": 0}
+            if scan_count % 5 == 0:
+                print(f"[Scan #{scan_count}] Signals: {signals_found} | Active: {len(active_trades)}/{MAX_CONCURRENT}")
+        except Exception as e:
+            print(f"Scanner Error: {e}")
+        time.sleep(30)
+
+threading.Thread(target=market_scanner, daemon=True).start()
+
 
 def call_gemini(prompt, retries=3):
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
-    
     for attempt in range(retries):
         try:
             r = requests.post(url + get_gemini_key(), json=payload, headers=headers, timeout=10)
@@ -178,39 +274,14 @@ def call_gemini(prompt, retries=3):
                 data = r.json()
                 return data['candidates'][0]['content']['parts'][0]['text']
             elif r.status_code == 429 or r.status_code == 403:
-                print("Gemini API Limit hit. Rotating key...")
                 rotate_gemini_key()
                 time.sleep(2)
             else:
-                print(f"Gemini API Error {r.status_code}: {r.text}")
                 rotate_gemini_key()
                 time.sleep(2)
         except Exception as e:
-            print(f"Gemini Request Exception: {e}")
             time.sleep(2)
     return "Error: AI Service Unavailable."
-
-def ai_risk_assessment(symbol, sweep, flow_delta, prob, price, sl, tp):
-    prompt = f"""You are an Aggressive AI Scalper. A quantitative algo found a 5-minute setup for {symbol}.
-    Setup Details:
-    - Liquidity Trap: {sweep}
-    - Order Flow Delta: {flow_delta:.2f}
-    - Statistical Win Prob: {prob:.2f}%
-    - Entry: {price}, SL: {sl}, TP: {tp}
-    
-    We need high-frequency trades. As long as Order Flow matches the Sweep direction, APPROVE IT.
-    Reply strictly in JSON format: {{"trade_approved": boolean, "reason": "1 short sentence reason"}}"""
-    
-    resp_text = call_gemini(prompt, retries=3)
-    if "Error" in resp_text:
-        return {"trade_approved": True, "reason": "Auto-Approved (API Retry Limit)"}
-    
-    try:
-        clean_text = resp_text.replace('```json', '').replace('```', '').strip()
-        data = json.loads(clean_text)
-        return data
-    except Exception as e:
-        return {"trade_approved": True, "reason": "Auto-Approved (Parse Error)"}
 
 def get_hindi_analysis(trade_data):
     prompt = f"""Aap ek professional crypto trading mentor hain. Ek beginner trader ko HINDI (roman english script) mein samjhao ki yeh trade kyun li gayi.
@@ -219,106 +290,10 @@ def get_hindi_analysis(trade_data):
     - Type: {trade_data['side']}
     - Entry Price: {trade_data['entry']}
     - Stop Loss: {trade_data['sl']}
-    - AI ka Reason: {trade_data['ai_reason']}
+    - AI ka Reason: {trade_data.get('ai_reason', 'N/A')}
     
-    Reply mein simple language use karna. Technical terms ko asaan bhasha mein samjhao jisse beginner bhi samajh sake. Maximum 3-4 lines."""
+    Reply mein simple language use karna. Maximum 3-4 lines."""
     return call_gemini(prompt, retries=2)
-
-# --- Scanner Thread ---
-def market_scanner():
-    global daily_pnl, daily_reset_date
-    print("Quant Scanner Started...")
-    while True:
-        try:
-            if not bot_running:
-                time.sleep(5)
-                continue
-                
-            # Daily Reset Check
-            today = datetime.now().strftime("%Y-%m-%d")
-            if today != daily_reset_date:
-                print(f"\n{'='*50}")
-                print(f"📅 NEW TRADING DAY: {today} | Yesterday PNL: ${daily_pnl:.2f}")
-                print(f"{'='*50}\n")
-                daily_pnl = 0.0
-                daily_reset_date = today
-                save_data()
-            
-            # CIRCUIT BREAKER
-            if daily_pnl <= -DAILY_LOSS_LIMIT:
-                print(f"🛑 DAILY LOSS LIMIT HIT (${daily_pnl:.2f}). No more trades today.")
-                time.sleep(300)
-                continue
-            
-            if len(active_trades) >= MAX_CONCURRENT:
-                time.sleep(10)
-                continue
-            
-            tickers = b_get("/fapi/v1/ticker/24hr")
-            valid_coins = [t for t in tickers if t["symbol"].endswith("USDT") and float(t["quoteVolume"]) > 50000000]
-            valid_coins.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
-            
-            for t in valid_coins[:50]:
-                sym = t["symbol"]
-                if sym in active_trades: continue
-                if len(active_trades) >= MAX_CONCURRENT: break
-                
-                # CHANGED to 5m timeframe for frequent trades
-                k_5m = b_get("/fapi/v1/klines", {"symbol": sym, "interval": "5m", "limit": 200})
-                if not k_5m or len(k_5m) < 50: continue
-                
-                sweep = detect_liquidity_sweep(k_5m)
-                if not sweep: continue
-                
-                flow_delta = calc_order_flow_delta(k_5m)
-                prob = knn_probability(k_5m)
-                
-                price = float(k_5m[-1][4])
-                
-                # Fast Intraday Trend Filter: EMA 21
-                ema_fast = calc_ema(k_5m, min(21, len(k_5m) - 1))
-                
-                direction = None
-                if sweep == "LONG_SWEEP" and flow_delta > 0 and prob >= MIN_WIN_PROBABILITY and price > ema_fast:
-                    direction = "LONG"
-                elif sweep == "SHORT_SWEEP" and flow_delta < 0 and prob <= -MIN_WIN_PROBABILITY and price < ema_fast:
-                    direction = "SHORT"
-                
-                if direction:
-                    atr = calc_atr(k_5m)
-                    
-                    max_sl_pct = MAX_RISK_PER_TRADE / (MARGIN_PER_TRADE * DEFAULT_LEVERAGE)
-                    sl_dist = min(2.5 * atr, price * max_sl_pct)
-                    tp_dist = sl_dist * 1.2
-                    
-                    if direction == "LONG":
-                        sl, tp = price - sl_dist, price + tp_dist
-                    else:
-                        sl, tp = price + sl_dist, price - tp_dist
-                        
-                    print(f"[{sym}] Asking AI Risk Manager...")
-                    ai_check = ai_risk_assessment(sym, sweep, flow_delta, prob, price, sl, tp)
-                    if not ai_check.get("trade_approved", True):
-                        continue
-                        
-                    trade_id = f"TRD_{int(time.time())}"
-                    active_trades[sym] = {
-                        "id": trade_id, "symbol": sym, "side": direction,
-                        "entry": price, "sl": sl, "tp": tp,
-                        "margin": MARGIN_PER_TRADE, "leverage": DEFAULT_LEVERAGE,
-                        "prob": abs(prob), "ai_reason": ai_check.get('reason', 'Approved'),
-                        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-                    save_data()
-                    print(f"SNIPER ENTRY: {direction} {sym}")
-                    
-                live_radar[sym] = {"sweep": sweep, "delta": flow_delta, "prob": abs(prob)}
-                
-        except Exception as e:
-            print(f"Scanner Error: {e}")
-        time.sleep(45)
-
-threading.Thread(target=market_scanner, daemon=True).start()
 
 # --- Trade Manager Thread ---
 def trade_manager():
@@ -533,7 +508,8 @@ HTML = """
                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                     <h6 class="text-white m-0"><i class="fa-brands fa-searchengin text-success"></i> LIVE CHART & AI ANALYSIS</h6>
                     <div class="d-flex gap-2">
-                        <input type="text" id="tvSymbol" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. BTCUSDT" value="BTCUSDT" style="min-width:130px;">
+                        <input type="text" id="tvSymbol" list="coinList" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="e.g. BTCUSDT" value="BTCUSDT" style="min-width:130px;">
+                        <datalist id="coinList"></datalist>
                         <button class="btn btn-sm btn-outline-info" onclick="changeChart()"><i class="fa-solid fa-search"></i> Chart</button>
                         <button class="btn btn-sm btn-ai" onclick="analyzeAnyCoin()"><i class="fa-solid fa-robot"></i> AI Analysis</button>
                     </div>
@@ -801,8 +777,21 @@ HTML = """
         } catch (e) { console.error(e); }
     }
 
+    async function loadSymbols() {
+        try {
+            const res = await fetch('/api/symbols');
+            const symbols = await res.json();
+            let html = '';
+            symbols.forEach(sym => {
+                html += `<option value="${sym}">`;
+            });
+            document.getElementById('coinList').innerHTML = html;
+        } catch (e) { console.error("Error loading symbols:", e); }
+    }
+
     setInterval(fetchData, 3000);
     fetchData();
+    loadSymbols();
 </script>
 </body>
 </html>
@@ -820,8 +809,19 @@ def api_data():
         "history": trade_history,
         "radar": live_radar,
         "daily_pnl": daily_pnl,
-        "bot_running": bot_running
     })
+
+@app.route('/api/symbols')
+def api_symbols():
+    try:
+        tickers = b_get("/fapi/v1/ticker/24hr")
+        if not tickers: return jsonify([])
+        symbols = [t["symbol"] for t in tickers if t["symbol"].endswith("USDT")]
+        symbols.sort()
+        return jsonify(symbols)
+    except Exception as e:
+        print(f"Error fetching symbols list: {e}")
+        return jsonify([])
 
 @app.route('/api/toggle_bot', methods=['POST'])
 def toggle_bot():
