@@ -36,7 +36,7 @@ DEFAULT_LEVERAGE = 10     # 10x lev = $150 position size
 MAX_CONCURRENT = 3        # Max 3 trades open = $45 used, $5 buffer
 MAX_RISK_PER_TRADE = 3.0  # Max $3 loss per trade
 DAILY_LOSS_LIMIT = 10.0   # HARD STOP
-MIN_WIN_PROBABILITY = 75  # Minimum AI probability
+MIN_WIN_PROBABILITY = 60  # Reduced from 75 to 60 for more aggressive scalping
 
 # Global State
 paper_wallet = INITIAL_BALANCE
@@ -100,9 +100,10 @@ def calc_ema(klines, period=200):
     return ema
 
 def detect_liquidity_sweep(klines):
-    if len(klines) < 25: return None
-    recent_lows = [float(k[3]) for k in klines[-20:-2]]
-    recent_highs = [float(k[2]) for k in klines[-20:-2]]
+    if len(klines) < 20: return None
+    # Look back 15 candles (1 hour 15 mins on 5m chart)
+    recent_lows = [float(k[3]) for k in klines[-15:-2]]
+    recent_highs = [float(k[2]) for k in klines[-15:-2]]
     
     major_support = min(recent_lows)
     major_resistance = max(recent_highs)
@@ -110,9 +111,14 @@ def detect_liquidity_sweep(klines):
     last_candle = klines[-2]
     lc_low, lc_high, lc_close, lc_open = float(last_candle[3]), float(last_candle[2]), float(last_candle[4]), float(last_candle[1])
     
-    if lc_low < major_support and lc_close > major_support and lc_close > lc_open:
+    # Check for strong rejection (long wick)
+    body = abs(lc_close - lc_open)
+    lower_wick = min(lc_open, lc_close) - lc_low
+    upper_wick = lc_high - max(lc_open, lc_close)
+    
+    if lc_low < major_support and lc_close > major_support and lower_wick > body:
         return "LONG_SWEEP"
-    if lc_high > major_resistance and lc_close < major_resistance and lc_close < lc_open:
+    if lc_high > major_resistance and lc_close < major_resistance and upper_wick > body:
         return "SHORT_SWEEP"
     return None
 
@@ -185,14 +191,14 @@ def call_gemini(prompt, retries=3):
     return "Error: AI Service Unavailable."
 
 def ai_risk_assessment(symbol, sweep, flow_delta, prob, price, sl, tp):
-    prompt = f"""You are a strict Institutional Risk Manager. A quantitative algo has found a setup for {symbol}.
+    prompt = f"""You are an Aggressive AI Scalper. A quantitative algo found a 5-minute setup for {symbol}.
     Setup Details:
     - Liquidity Trap: {sweep}
     - Order Flow Delta: {flow_delta:.2f}
     - Statistical Win Prob: {prob:.2f}%
     - Entry: {price}, SL: {sl}, TP: {tp}
     
-    Evaluate if this aligns with a high-conviction, professional risk strategy.
+    We need high-frequency trades. As long as Order Flow matches the Sweep direction, APPROVE IT.
     Reply strictly in JSON format: {{"trade_approved": boolean, "reason": "1 short sentence reason"}}"""
     
     resp_text = call_gemini(prompt, retries=3)
@@ -257,19 +263,20 @@ def market_scanner():
                 if sym in active_trades: continue
                 if len(active_trades) >= MAX_CONCURRENT: break
                 
-                k_15m = b_get("/fapi/v1/klines", {"symbol": sym, "interval": "15m", "limit": 200})
-                if not k_15m or len(k_15m) < 50: continue
+                # CHANGED to 5m timeframe for frequent trades
+                k_5m = b_get("/fapi/v1/klines", {"symbol": sym, "interval": "5m", "limit": 200})
+                if not k_5m or len(k_5m) < 50: continue
                 
-                sweep = detect_liquidity_sweep(k_15m)
+                sweep = detect_liquidity_sweep(k_5m)
                 if not sweep: continue
                 
-                flow_delta = calc_order_flow_delta(k_15m)
-                prob = knn_probability(k_15m)
+                flow_delta = calc_order_flow_delta(k_5m)
+                prob = knn_probability(k_5m)
                 
-                price = float(k_15m[-1][4])
+                price = float(k_5m[-1][4])
                 
                 # Fast Intraday Trend Filter: EMA 21
-                ema_fast = calc_ema(k_15m, min(21, len(k_15m) - 1))
+                ema_fast = calc_ema(k_5m, min(21, len(k_5m) - 1))
                 
                 direction = None
                 if sweep == "LONG_SWEEP" and flow_delta > 0 and prob >= MIN_WIN_PROBABILITY and price > ema_fast:
@@ -278,7 +285,7 @@ def market_scanner():
                     direction = "SHORT"
                 
                 if direction:
-                    atr = calc_atr(k_15m)
+                    atr = calc_atr(k_5m)
                     
                     max_sl_pct = MAX_RISK_PER_TRADE / (MARGIN_PER_TRADE * DEFAULT_LEVERAGE)
                     sl_dist = min(1.5 * atr, price * max_sl_pct)
