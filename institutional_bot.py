@@ -312,7 +312,7 @@ threading.Thread(target=market_scanner, daemon=True).start()
 
 
 def call_gemini(prompt, retries=3):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
     for attempt in range(retries):
@@ -321,13 +321,12 @@ def call_gemini(prompt, retries=3):
             if r.status_code == 200:
                 data = r.json()
                 return data['candidates'][0]['content']['parts'][0]['text']
-            elif r.status_code == 429 or r.status_code == 403:
-                rotate_gemini_key()
-                time.sleep(2)
             else:
+                print(f"⚠️ Gemini API Error (Status {r.status_code}): {r.text.strip()}")
                 rotate_gemini_key()
                 time.sleep(2)
         except Exception as e:
+            print(f"⚠️ Gemini Exception: {e}")
             time.sleep(2)
     return "Error: AI Service Unavailable."
 
