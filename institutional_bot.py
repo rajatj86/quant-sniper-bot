@@ -226,8 +226,10 @@ def market_scanner():
                 continue
             # Filter for liquidity, then sort by highest volatility (Price Change % magnitude) to catch surging coins
             valid_coins = [t for t in tickers if t.get("symbol","").endswith("USDT") and float(t.get("quoteVolume", 0)) > 15000000]
+            valid_coins.sort(key=lambda x: abs(float(x.get("priceChangePercent", 0))), reverse=True)
             signals_found = 0
-            ai_calls_this_cycle = 0
+            pending_signals = []
+            
             for t in valid_coins[:50]:
                 sym = t["symbol"]
                 if sym in active_trades: continue
@@ -268,12 +270,6 @@ def market_scanner():
                         reason = f"BB Breakout + RSI {rsi_val:.0f}"
                 if direction:
                     signals_found += 1
-                    
-                    # Prevent hitting Gemini API limits by capping at 2 verifications per scan cycle
-                    if ai_calls_this_cycle >= 2:
-                        print(f"⏳ Max AI verifications (2) reached for this cycle. Skipping {sym} signal.")
-                        continue
-                        
                     atr = calc_atr(k_5m)
                     if atr == 0: continue
                     max_sl_pct = MAX_RISK_PER_TRADE / (MARGIN_PER_TRADE * DEFAULT_LEVERAGE)
@@ -284,35 +280,70 @@ def market_scanner():
                         sl, tp = price - sl_dist, price + tp_dist
                     else:
                         sl, tp = price + sl_dist, price - tp_dist
-                        
-                    # --- AI VERIFICATION (The "Best Indicator") ---
-                    ai_calls_this_cycle += 1
-                    ai_prompt = f"Analyze {sym} 5m timeframe. Technicals show {strategy} signal for {direction} ({reason}). Price: {price}. As an expert quant, is this a safe scalp? Reply with EXACTLY 'YES' or 'NO' and 1 short reason."
-                    print(f"🧠 Asking AI for Trade Confirmation on {sym}... ({ai_calls_this_cycle}/2)")
-                    ai_response = call_gemini(ai_prompt, retries=1)
                     
-                    if "YES" not in ai_response.upper() and "yes" not in ai_response.lower():
-                        print(f"🚫 AI REJECTED {sym} {direction}: {ai_response.strip()}")
-                        time.sleep(2) # Space out API calls
-                        continue
-                        
-                    print(f"✅ AI APPROVED {sym} {direction}!")
-                    ai_final_reason = ai_response.replace('YES', '').replace('yes', '').strip()[:40]
+                    # Add to batch verification list
+                    pending_signals.append({
+                        "symbol": sym, "side": direction, "strategy": strategy, "reason": reason,
+                        "price": price, "sl": sl, "tp": tp
+                    })
+                live_radar[sym] = {"sweep": strategy or "SCANNING", "delta": 0, "prob": 0}
+                
+            # --- BATCH AI VERIFICATION ---
+            max_new_trades = MAX_CONCURRENT - len(active_trades)
+            if pending_signals and max_new_trades > 0:
+                signals_text = ""
+                for idx, sig in enumerate(pending_signals):
+                    signals_text += f"{idx+1}. {sig['symbol']}: {sig['side']} setup based on {sig['strategy']} ({sig['reason']}). Price: {sig['price']}.\n"
+                
+                ai_prompt = f"""You are an expert crypto quant trader. I have the following potential scalp trade setups:
+{signals_text}
+Maximum concurrent new trades I can open right now is {max_new_trades}.
+Analyze these setups carefully. Output ONLY a valid JSON object (no markdown, no other text) with this structure:
+{{
+  "approved": ["SYMBOL1", "SYMBOL2"],
+  "reasons": {{
+    "SYMBOL1": "short reason why this is the highest probability setup",
+    "SYMBOL2": "short reason why this is the highest probability setup"
+  }}
+}}
+If none of the setups are safe or high probability, return "approved": []."""
+                
+                print(f"🧠 Asking AI to evaluate {len(pending_signals)} setups in a single batch call...")
+                ai_response = call_gemini(ai_prompt, retries=2)
+                
+                try:
+                    clean_response = ai_response.strip().replace("```json", "").replace("```", "").strip()
+                    data = json.loads(clean_response)
+                    approved_symbols = data.get("approved", [])
+                    reasons = data.get("reasons", {})
+                except Exception as e:
+                    print(f"⚠️ Failed to parse batch AI response: {e}. Raw: {ai_response.strip()[:150]}")
+                    approved_symbols = []
+                    reasons = {}
+                
+                # Execute approved trades
+                opened_count = 0
+                for sym in approved_symbols:
+                    if opened_count >= max_new_trades: break
+                    if sym in active_trades: continue
+                    sig = next((s for s in pending_signals if s["symbol"] == sym), None)
+                    if not sig: continue
                     
+                    ai_reason = reasons.get(sym, "AI Approved")[:40]
                     trade_id = f"TRD_{int(time.time())}_{sym[:4]}"
                     active_trades[sym] = {
-                        "id": trade_id, "symbol": sym, "side": direction,
-                        "entry": price, "sl": sl, "tp": tp,
+                        "id": trade_id, "symbol": sym, "side": sig["side"],
+                        "entry": sig["price"], "sl": sig["sl"], "tp": sig["tp"],
                         "margin": MARGIN_PER_TRADE, "leverage": DEFAULT_LEVERAGE,
-                        "prob": 0, "ai_reason": f"[{strategy}] {ai_final_reason}",
+                        "prob": 0, "ai_reason": f"[{sig['strategy']}] {ai_reason}",
                         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     save_data()
-                    print(f"🎯 ENTRY: {direction} {sym} @ {price:.4f} | {strategy} | {ai_final_reason}")
-                    time.sleep(2) # Space out API calls
-                live_radar[sym] = {"sweep": strategy or "SCANNING", "delta": 0, "prob": 0}
+                    print(f"🎯 ENTRY (BATCH APPROVED): {sig['side']} {sym} @ {sig['price']:.4f} | {sig['strategy']} | {ai_reason}")
+                    opened_count += 1
+                    
             if scan_count % 5 == 0:
-                print(f"[Scan #{scan_count}] Signals: {signals_found} | Active: {len(active_trades)}/{MAX_CONCURRENT}")
+                print(f"[Scan #{scan_count}] Signals Found: {signals_found} | Active: {len(active_trades)}/{MAX_CONCURRENT}")
         except Exception as e:
             print(f"Scanner Error: {e}")
         time.sleep(30)
