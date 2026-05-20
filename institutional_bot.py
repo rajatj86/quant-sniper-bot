@@ -224,8 +224,9 @@ def market_scanner():
                 print(f"[Scan #{scan_count}] ⚠️ No Binance data. Retrying...")
                 time.sleep(10)
                 continue
-            valid_coins = [t for t in tickers if t.get("symbol","").endswith("USDT") and float(t.get("quoteVolume", 0)) > 30000000]
-            valid_coins.sort(key=lambda x: float(x.get("quoteVolume", 0)), reverse=True)
+            # Filter for liquidity, then sort by highest volatility (Price Change % magnitude) to catch surging coins
+            valid_coins = [t for t in tickers if t.get("symbol","").endswith("USDT") and float(t.get("quoteVolume", 0)) > 15000000]
+            valid_coins.sort(key=lambda x: abs(float(x.get("priceChangePercent", 0))), reverse=True)
             signals_found = 0
             for t in valid_coins[:50]:
                 sym = t["symbol"]
