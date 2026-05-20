@@ -277,16 +277,29 @@ def market_scanner():
                         sl, tp = price - sl_dist, price + tp_dist
                     else:
                         sl, tp = price + sl_dist, price - tp_dist
+                        
+                    # --- AI VERIFICATION (The "Best Indicator") ---
+                    ai_prompt = f"Analyze {sym} 5m timeframe. Technicals show {strategy} signal for {direction} ({reason}). Price: {price}. As an expert quant, is this a safe scalp? Reply with EXACTLY 'YES' or 'NO' and 1 short reason."
+                    print(f"🧠 Asking AI for Trade Confirmation on {sym}...")
+                    ai_response = call_gemini(ai_prompt, retries=1)
+                    
+                    if "YES" not in ai_response.upper() and "yes" not in ai_response.lower():
+                        print(f"🚫 AI REJECTED {sym} {direction}: {ai_response.strip()}")
+                        continue
+                        
+                    print(f"✅ AI APPROVED {sym} {direction}!")
+                    ai_final_reason = ai_response.replace('YES', '').replace('yes', '').strip()[:40]
+                    
                     trade_id = f"TRD_{int(time.time())}_{sym[:4]}"
                     active_trades[sym] = {
                         "id": trade_id, "symbol": sym, "side": direction,
                         "entry": price, "sl": sl, "tp": tp,
                         "margin": MARGIN_PER_TRADE, "leverage": DEFAULT_LEVERAGE,
-                        "prob": 0, "ai_reason": f"[{strategy}] {reason}",
+                        "prob": 0, "ai_reason": f"[{strategy}] {ai_final_reason}",
                         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     save_data()
-                    print(f"🎯 ENTRY: {direction} {sym} @ {price:.4f} | {strategy} | {reason}")
+                    print(f"🎯 ENTRY: {direction} {sym} @ {price:.4f} | {strategy} | {ai_final_reason}")
                 live_radar[sym] = {"sweep": strategy or "SCANNING", "delta": 0, "prob": 0}
             if scan_count % 5 == 0:
                 print(f"[Scan #{scan_count}] Signals: {signals_found} | Active: {len(active_trades)}/{MAX_CONCURRENT}")
