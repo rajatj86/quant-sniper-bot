@@ -312,7 +312,7 @@ threading.Thread(target=market_scanner, daemon=True).start()
 
 
 def call_gemini(prompt, retries=3):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
     for attempt in range(retries):
