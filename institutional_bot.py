@@ -226,8 +226,8 @@ def market_scanner():
                 continue
             # Filter for liquidity, then sort by highest volatility (Price Change % magnitude) to catch surging coins
             valid_coins = [t for t in tickers if t.get("symbol","").endswith("USDT") and float(t.get("quoteVolume", 0)) > 15000000]
-            valid_coins.sort(key=lambda x: abs(float(x.get("priceChangePercent", 0))), reverse=True)
             signals_found = 0
+            ai_calls_this_cycle = 0
             for t in valid_coins[:50]:
                 sym = t["symbol"]
                 if sym in active_trades: continue
@@ -268,6 +268,12 @@ def market_scanner():
                         reason = f"BB Breakout + RSI {rsi_val:.0f}"
                 if direction:
                     signals_found += 1
+                    
+                    # Prevent hitting Gemini API limits by capping at 2 verifications per scan cycle
+                    if ai_calls_this_cycle >= 2:
+                        print(f"⏳ Max AI verifications (2) reached for this cycle. Skipping {sym} signal.")
+                        continue
+                        
                     atr = calc_atr(k_5m)
                     if atr == 0: continue
                     max_sl_pct = MAX_RISK_PER_TRADE / (MARGIN_PER_TRADE * DEFAULT_LEVERAGE)
@@ -280,12 +286,14 @@ def market_scanner():
                         sl, tp = price + sl_dist, price - tp_dist
                         
                     # --- AI VERIFICATION (The "Best Indicator") ---
+                    ai_calls_this_cycle += 1
                     ai_prompt = f"Analyze {sym} 5m timeframe. Technicals show {strategy} signal for {direction} ({reason}). Price: {price}. As an expert quant, is this a safe scalp? Reply with EXACTLY 'YES' or 'NO' and 1 short reason."
-                    print(f"🧠 Asking AI for Trade Confirmation on {sym}...")
+                    print(f"🧠 Asking AI for Trade Confirmation on {sym}... ({ai_calls_this_cycle}/2)")
                     ai_response = call_gemini(ai_prompt, retries=1)
                     
                     if "YES" not in ai_response.upper() and "yes" not in ai_response.lower():
                         print(f"🚫 AI REJECTED {sym} {direction}: {ai_response.strip()}")
+                        time.sleep(2) # Space out API calls
                         continue
                         
                     print(f"✅ AI APPROVED {sym} {direction}!")
@@ -301,6 +309,7 @@ def market_scanner():
                     }
                     save_data()
                     print(f"🎯 ENTRY: {direction} {sym} @ {price:.4f} | {strategy} | {ai_final_reason}")
+                    time.sleep(2) # Space out API calls
                 live_radar[sym] = {"sweep": strategy or "SCANNING", "delta": 0, "prob": 0}
             if scan_count % 5 == 0:
                 print(f"[Scan #{scan_count}] Signals: {signals_found} | Active: {len(active_trades)}/{MAX_CONCURRENT}")
