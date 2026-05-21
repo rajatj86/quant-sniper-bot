@@ -13,7 +13,7 @@ app = Flask(__name__)
 BINANCE_FAPI = "https://fapi.binance.com"
 TRADE_LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quant_paper_trades.json")
 
-# --- Multi-API Key Rotation ---
+# --- Multi-API Key & Model Rotation ---
 GEMINI_KEYS = [
     "AIzaSyA0UMYMS7e11lK2t-c-IkOydYAtWj6EuuE",
     "AIzaSyDcALFI95JYAHWFfu9EmbSCobl91lbsjKI",
@@ -21,13 +21,28 @@ GEMINI_KEYS = [
 ]
 current_key_idx = 0
 
+GEMINI_MODELS = [
+    "gemini-3.1-flash-lite",  # Primary model with high quota (500 RPD)
+    "gemini-2.0-flash",       # Backup model 1 (20 RPD)
+    "gemini-2.5-flash"        # Backup model 2 (20 RPD)
+]
+current_model_idx = 0
+
 def get_gemini_key():
     return GEMINI_KEYS[current_key_idx]
+
+def get_gemini_model():
+    return GEMINI_MODELS[current_model_idx]
 
 def rotate_gemini_key():
     global current_key_idx
     current_key_idx = (current_key_idx + 1) % len(GEMINI_KEYS)
     print(f"Rotated Gemini API Key. Now using key index: {current_key_idx}")
+
+def rotate_gemini_model():
+    global current_model_idx
+    current_model_idx = (current_model_idx + 1) % len(GEMINI_MODELS)
+    print(f"Rotated Gemini Model. Now using: {get_gemini_model()}")
 
 # --- Professional Intraday Settings ---
 INITIAL_BALANCE = 50.0
@@ -129,6 +144,90 @@ def calc_volume_spike(klines, lookback=20):
     if avg_vol == 0: return 1.0
     return curr_vol / avg_vol
 
+def calc_macd(klines):
+    closes = [float(k[4]) for k in klines]
+    if len(closes) < 35: return None, None, None, None
+    ema12 = calc_ema_values(closes, 12)
+    ema26 = calc_ema_values(closes, 26)
+    
+    min_len = min(len(ema12), len(ema26))
+    if min_len < 10: return None, None, None, None
+    macd_line = []
+    for i in range(-min_len, 0):
+        macd_line.append(ema12[i] - ema26[i])
+        
+    signal_line = calc_ema_values(macd_line, 9)
+    if not signal_line or len(signal_line) < 2: return None, None, None, None
+    
+    return macd_line[-1], signal_line[-1], macd_line[-2], signal_line[-2]
+
+def calc_supertrend(klines, period=10, multiplier=3.0):
+    if len(klines) < period + 1: return None, None
+    
+    highs = [float(k[2]) for k in klines]
+    lows = [float(k[3]) for k in klines]
+    closes = [float(k[4]) for k in klines]
+    
+    trs = [0]
+    for i in range(1, len(klines)):
+        h, l, pc = highs[i], lows[i], closes[i-1]
+        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
+        
+    atrs = [0] * period
+    for i in range(period, len(klines)):
+        atrs.append(sum(trs[i-period+1:i+1]) / period)
+        
+    final_upper = [0] * len(klines)
+    final_lower = [0] * len(klines)
+    trend = [1] * len(klines)
+    
+    for i in range(period, len(klines)):
+        hl2 = (highs[i] + lows[i]) / 2
+        basic_upper = hl2 + (multiplier * atrs[i])
+        basic_lower = hl2 - (multiplier * atrs[i])
+        
+        if basic_upper < final_upper[i-1] or closes[i-1] > final_upper[i-1]:
+            final_upper[i] = basic_upper
+        else:
+            final_upper[i] = final_upper[i-1]
+            
+        if basic_lower > final_lower[i-1] or closes[i-1] < final_lower[i-1]:
+            final_lower[i] = basic_lower
+        else:
+            final_lower[i] = final_lower[i-1]
+            
+        if trend[i-1] == 1 and closes[i] < final_lower[i]:
+            trend[i] = -1
+        elif trend[i-1] == -1 and closes[i] > final_upper[i]:
+            trend[i] = 1
+        else:
+            trend[i] = trend[i-1]
+            
+    return trend[-1], trend[-2]
+
+def detect_super_confluence(klines):
+    if len(klines) < 50: return None
+    
+    ema_200 = calc_ema(klines[:-1], 200) # Use closed candles
+    if ema_200 == 0: return None
+    price = float(klines[-2][4])
+    
+    st_curr, st_prev = calc_supertrend(klines[:-1], 10, 3.0)
+    if not st_curr: return None
+    
+    macd_curr, sig_curr, macd_prev, sig_prev = calc_macd(klines[:-1])
+    if macd_curr is None: return None
+    
+    if price > ema_200 and st_curr == 1:
+        if macd_prev < sig_prev and macd_curr > sig_curr:
+            return "LONG"
+            
+    if price < ema_200 and st_curr == -1:
+        if macd_prev > sig_prev and macd_curr < sig_curr:
+            return "SHORT"
+            
+    return None
+
 def detect_ema_cross(klines):
     closes = [float(k[4]) for k in klines]
     if len(closes) < 22: return None
@@ -144,8 +243,11 @@ def detect_ema_cross(klines):
     return None
 
 def detect_rsi_signal(klines):
-    rsi = calc_rsi(klines, 14)
-    rsi_prev = calc_rsi(klines[:-1], 14)
+    if len(klines) < 16: return None, 50
+    # Use only closed candles to prevent repainting fakeouts
+    rsi = calc_rsi(klines[:-1], 14)       # Last closed candle
+    rsi_prev = calc_rsi(klines[:-2], 14)  # Previous closed candle
+    
     if rsi_prev < 30 and rsi >= 30: return "LONG", rsi
     if rsi_prev > 70 and rsi <= 70: return "SHORT", rsi
     return None, rsi
@@ -178,16 +280,30 @@ def detect_bb_rsi_combo(klines, rsi_val):
     upper, sma, lower = calc_bollinger_bands(klines, 20, 2)
     if upper == 0 and lower == 0: return None
     
+    prev_candle = klines[-3]
     last_candle = klines[-2] # using previous closed candle for reliable signal
+    
+    prev_close = float(prev_candle[4])
     close = float(last_candle[4])
     
-    # LONG: Price closes below lower band, RSI is oversold
-    if close < lower and rsi_val < 35:
+    # LONG: Rejection from lower band (pierced lower, closed back inside)
+    if prev_close < lower and close > lower and rsi_val < 35:
         return "LONG"
-    # SHORT: Price closes above upper band, RSI is overbought
-    if close > upper and rsi_val > 65:
+    # SHORT: Rejection from upper band (pierced upper, closed back inside)
+    if prev_close > upper and close < upper and rsi_val > 65:
         return "SHORT"
     return None
+
+def calc_order_flow_delta(klines, period=10):
+    if len(klines) < period: return 0
+    delta = 0
+    for k in klines[-period:]:
+        o, c, v = float(k[1]), float(k[4]), float(k[5])
+        if c > o:
+            delta += v
+        elif c < o:
+            delta -= v
+    return delta
 
 # --- Scanner Thread (Multi-Strategy, Zero AI tokens) ---
 def market_scanner():
@@ -241,12 +357,19 @@ def market_scanner():
                 direction = None
                 strategy = ""
                 reason = ""
+                # STRATEGY 0: Super Confluence (MACD + Supertrend + 200 EMA)
+                super_sig = detect_super_confluence(k_5m)
+                if super_sig:
+                    direction = super_sig
+                    strategy = "SUPER_CONFLUENCE"
+                    reason = "MACD + Supertrend + 200 EMA"
                 # STRATEGY 1: RSI Reversal
-                rsi_sig, rsi_val = detect_rsi_signal(k_5m)
-                if rsi_sig:
-                    direction = rsi_sig
-                    strategy = "RSI_REVERSAL"
-                    reason = f"RSI {rsi_val:.0f} bounce"
+                if not direction:
+                    rsi_sig, rsi_val = detect_rsi_signal(k_5m)
+                    if rsi_sig:
+                        direction = rsi_sig
+                        strategy = "RSI_REVERSAL"
+                        reason = f"RSI {rsi_val:.0f} bounce"
                 # STRATEGY 2: EMA 9/21 Cross
                 if not direction:
                     ema_sig = detect_ema_cross(k_5m)
@@ -269,6 +392,11 @@ def market_scanner():
                         strategy = "BB_RSI_COMBO"
                         reason = f"BB Breakout + RSI {rsi_val:.0f}"
                 if direction:
+                    # HTF Trend Filter
+                    ema_50 = calc_ema(k_5m, 50)
+                    if (direction == "LONG" and price < ema_50) or (direction == "SHORT" and price > ema_50):
+                        continue # Reject counter-trend trades
+                    
                     signals_found += 1
                     atr = calc_atr(k_5m)
                     if atr == 0: continue
@@ -344,25 +472,40 @@ If none of the setups are safe or high probability, return "approved": []."""
                     
             if scan_count % 5 == 0:
                 print(f"[Scan #{scan_count}] Signals Found: {signals_found} | Active: {len(active_trades)}/{MAX_CONCURRENT}")
+            # Calculate time to sleep until next 5m candle close (+5s buffer)
+            now = time.time()
+            sleep_time = 300 - (now % 300) + 5
+            if sleep_time < 30:
+                sleep_time += 300
+            print(f"💤 Scan #{scan_count} completed. Waiting {int(sleep_time)}s for the next candle close...")
+            time.sleep(sleep_time)
         except Exception as e:
             print(f"Scanner Error: {e}")
-        time.sleep(30)
+            time.sleep(10)
 
 threading.Thread(target=market_scanner, daemon=True).start()
 
 
 def call_gemini(prompt, retries=3):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     for attempt in range(retries):
+        model = get_gemini_model()
+        key = get_gemini_key()
+        # Using stable v1 endpoint as verified by test script
+        url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={key}"
         try:
-            r = requests.post(url + get_gemini_key(), json=payload, headers=headers, timeout=10)
+            r = requests.post(url, json=payload, headers=headers, timeout=10)
             if r.status_code == 200:
                 data = r.json()
                 return data['candidates'][0]['content']['parts'][0]['text']
+            elif r.status_code == 429:
+                print(f"⚠️ Gemini API Quota Exceeded (429) for {model} using key {current_key_idx}. Rotating key and model...")
+                rotate_gemini_key()
+                rotate_gemini_model()
+                time.sleep(2)
             else:
-                print(f"⚠️ Gemini API Error (Status {r.status_code}): {r.text.strip()}")
+                print(f"⚠️ Gemini API Error (Status {r.status_code}): {r.text.strip()[:150]}")
                 rotate_gemini_key()
                 time.sleep(2)
         except Exception as e:
