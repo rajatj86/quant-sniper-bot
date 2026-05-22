@@ -46,12 +46,13 @@ def rotate_gemini_model():
 
 # --- Professional Intraday Settings ---
 INITIAL_BALANCE = 50.0
-MARGIN_PER_TRADE = 15.0   # Small position: $15 margin per trade
-DEFAULT_LEVERAGE = 10     # 10x lev = $150 position size
-MAX_CONCURRENT = 3        # Max 3 trades open = $45 used, $5 buffer
-MAX_RISK_PER_TRADE = 3.0  # Max $3 loss per trade
-DAILY_LOSS_LIMIT = 10.0   # HARD STOP
-MIN_WIN_PROBABILITY = 60  # Reduced from 75 to 60 for more aggressive scalping
+MARGIN_PER_TRADE = 5.0     # Small position: $5 margin per trade
+DEFAULT_LEVERAGE = 10      # 10x lev = $50 position size
+MAX_CONCURRENT = 3         # Max 3 trades open = $15 used
+MAX_RISK_PER_TRADE = 1.0   # Max $1 loss per trade
+DAILY_LOSS_LIMIT = 3.0     # HARD STOP
+MIN_WIN_PROBABILITY = 60   # Reduced from 75 to 60 for more aggressive scalping
+ENABLE_SUPER_CONFLUENCE_ONLY = True  # Strict high-win rate trading only
 
 # Global State
 paper_wallet = INITIAL_BALANCE
@@ -208,23 +209,40 @@ def calc_supertrend(klines, period=10, multiplier=3.0):
 def detect_super_confluence(klines):
     if len(klines) < 50: return None
     
-    ema_200 = calc_ema(klines[:-1], 200) # Use closed candles
-    if ema_200 == 0: return None
+    # 1. Macro Trend Filter (200 EMA, fallback to 50 EMA for new coins)
+    ema_val = calc_ema(klines[:-1], 200)
+    if ema_val == 0:
+        ema_val = calc_ema(klines[:-1], 50)
+        if ema_val == 0: return None
+        
     price = float(klines[-2][4])
     
+    # 2. Supertrend
     st_curr, st_prev = calc_supertrend(klines[:-1], 10, 3.0)
     if not st_curr: return None
     
+    # 3. MACD Crossover
     macd_curr, sig_curr, macd_prev, sig_prev = calc_macd(klines[:-1])
     if macd_curr is None: return None
     
-    if price > ema_200 and st_curr == 1:
+    # 4. RSI filter (prevents buying the top / selling the bottom)
+    rsi_val = calc_rsi(klines[:-1], 14)
+    
+    # 5. Bollinger Bands position filter (ensures room to move)
+    upper, sma, lower = calc_bollinger_bands(klines[:-1], 20, 2)
+    if upper == 0 or lower == 0: return None
+    
+    # LONG CONDITIONS
+    if price > ema_val and st_curr == 1:
         if macd_prev < sig_prev and macd_curr > sig_curr:
-            return "LONG"
+            if rsi_val < 65 and price < upper:
+                return "LONG"
             
-    if price < ema_200 and st_curr == -1:
+    # SHORT CONDITIONS
+    if price < ema_val and st_curr == -1:
         if macd_prev > sig_prev and macd_curr < sig_curr:
-            return "SHORT"
+            if rsi_val > 35 and price > lower:
+                return "SHORT"
             
     return None
 
@@ -364,45 +382,46 @@ def market_scanner():
                     strategy = "SUPER_CONFLUENCE"
                     reason = "MACD + Supertrend + 200 EMA"
                 # STRATEGY 1: RSI Reversal
-                if not direction:
+                if not direction and not ENABLE_SUPER_CONFLUENCE_ONLY:
                     rsi_sig, rsi_val = detect_rsi_signal(k_5m)
                     if rsi_sig:
                         direction = rsi_sig
                         strategy = "RSI_REVERSAL"
                         reason = f"RSI {rsi_val:.0f} bounce"
                 # STRATEGY 2: EMA 9/21 Cross
-                if not direction:
+                if not direction and not ENABLE_SUPER_CONFLUENCE_ONLY:
                     ema_sig = detect_ema_cross(k_5m)
                     if ema_sig:
                         direction = ema_sig
                         strategy = "EMA_CROSS"
                         reason = f"EMA 9/21 {ema_sig}"
                 # STRATEGY 3: Volume Breakout
-                if not direction:
+                if not direction and not ENABLE_SUPER_CONFLUENCE_ONLY:
                     vol_sig = detect_volume_breakout(k_5m)
                     if vol_sig:
                         direction = vol_sig
                         strategy = "VOL_BREAKOUT"
                         reason = f"Volume {calc_volume_spike(k_5m,20):.1f}x spike"
                 # STRATEGY 4: BB + RSI Combo
-                if not direction:
+                if not direction and not ENABLE_SUPER_CONFLUENCE_ONLY:
                     bb_rsi_sig = detect_bb_rsi_combo(k_5m, rsi_val)
                     if bb_rsi_sig:
                         direction = bb_rsi_sig
                         strategy = "BB_RSI_COMBO"
                         reason = f"BB Breakout + RSI {rsi_val:.0f}"
                 if direction:
-                    # HTF Trend Filter
-                    ema_50 = calc_ema(k_5m, 50)
-                    if (direction == "LONG" and price < ema_50) or (direction == "SHORT" and price > ema_50):
-                        continue # Reject counter-trend trades
+                    # HTF Trend Filter (only for legacy strategies; super confluence has built-in trend checks)
+                    if strategy != "SUPER_CONFLUENCE":
+                        ema_50 = calc_ema(k_5m, 50)
+                        if (direction == "LONG" and price < ema_50) or (direction == "SHORT" and price > ema_50):
+                            continue # Reject counter-trend trades
                     
                     signals_found += 1
                     atr = calc_atr(k_5m)
                     if atr == 0: continue
                     max_sl_pct = MAX_RISK_PER_TRADE / (MARGIN_PER_TRADE * DEFAULT_LEVERAGE)
                     sl_dist = min(2.0 * atr, price * max_sl_pct)
-                    tp_dist = sl_dist * 1.5
+                    tp_dist = sl_dist * 2.0
                     if sl_dist == 0: continue
                     if direction == "LONG":
                         sl, tp = price - sl_dist, price + tp_dist
