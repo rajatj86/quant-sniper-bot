@@ -14,11 +14,33 @@ BINANCE_FAPI = "https://fapi.binance.com"
 TRADE_LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quant_paper_trades.json")
 
 # --- Multi-API Key & Model Rotation ---
-GEMINI_KEYS = [
-    "AIzaSyA0UMYMS7e11lK2t-c-IkOydYAtWj6EuuE",
-    "AIzaSyDcALFI95JYAHWFfu9EmbSCobl91lbsjKI",
-    "AIzaSyCsUsK4zluODK81hPXS30lXUM0OJx-EtCs"
-]
+# Load .env file manually if it exists in the script directory
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_env_path = os.path.join(_script_dir, ".env")
+if os.path.exists(_env_path):
+    try:
+        with open(_env_path, "r") as f:
+            for line in f:
+                if line.strip() and not line.strip().startswith("#") and "=" in line:
+                    parts = line.strip().split("=", 1)
+                    if len(parts) == 2:
+                        os.environ[parts[0].strip()] = parts[1].strip().strip('"').strip("'")
+    except Exception as e:
+        print(f"Error loading .env file: {e}")
+
+_env_keys = os.environ.get("GEMINI_API_KEY")
+if _env_keys:
+    GEMINI_KEYS = [k.strip() for k in _env_keys.split(",") if k.strip()]
+    print(f"Loaded {len(GEMINI_KEYS)} Gemini API Key(s) from environment/env-file.")
+else:
+    # Fallback to hardcoded keys (might be disabled if leaked)
+    GEMINI_KEYS = [
+        "AIzaSyA0UMYMS7e11lK2t-c-IkOydYAtWj6EuuE",
+        "AIzaSyDcALFI95JYAHWFfu9EmbSCobl91lbsjKI",
+        "AIzaSyCsUsK4zluODK81hPXS30lXUM0OJx-EtCs"
+    ]
+    print("⚠️ WARNING: No GEMINI_API_KEY found in environment or .env file. Falling back to default keys.")
+
 current_key_idx = 0
 
 GEMINI_MODELS = [
@@ -29,14 +51,15 @@ GEMINI_MODELS = [
 current_model_idx = 0
 
 def get_gemini_key():
-    return GEMINI_KEYS[current_key_idx]
+    return GEMINI_KEYS[current_key_idx] if GEMINI_KEYS else ""
 
 def get_gemini_model():
     return GEMINI_MODELS[current_model_idx]
 
 def rotate_gemini_key():
     global current_key_idx
-    current_key_idx = (current_key_idx + 1) % len(GEMINI_KEYS)
+    if len(GEMINI_KEYS) > 0:
+        current_key_idx = (current_key_idx + 1) % len(GEMINI_KEYS)
     print(f"Rotated Gemini API Key. Now using key index: {current_key_idx}")
 
 def rotate_gemini_model():
