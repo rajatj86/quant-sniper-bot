@@ -69,12 +69,11 @@ def rotate_gemini_model():
 
 # --- Professional Intraday Settings ---
 INITIAL_BALANCE = 50.0
-MARGIN_PER_TRADE = 5.0     # Small position: $5 margin per trade
-DEFAULT_LEVERAGE = 10      # 10x lev = $50 position size
-MAX_CONCURRENT = 3         # Max 3 trades open = $15 used
-MAX_RISK_PER_TRADE = 1.0   # Max $1 loss per trade
-DAILY_LOSS_LIMIT = 3.0     # HARD STOP
-MIN_WIN_PROBABILITY = 60   # Reduced from 75 to 60 for more aggressive scalping
+DEFAULT_LEVERAGE = 10      # 10x leverage
+MAX_CONCURRENT = 2         # Max 2 trades at once (quality > quantity)
+MAX_RISK_PER_TRADE = 1.0   # Fixed $1 risk per trade (position size adapts)
+DAILY_LOSS_LIMIT = 3.0     # HARD STOP for the day
+MIN_QUOTE_VOLUME = 50_000_000  # Only trade coins with $50M+ daily volume
 ENABLE_SUPER_CONFLUENCE_ONLY = True  # Strict high-win rate trading only
 
 # Global State
@@ -229,44 +228,80 @@ def calc_supertrend(klines, period=10, multiplier=3.0):
             
     return trend[-1], trend[-2]
 
-def detect_super_confluence(klines):
-    if len(klines) < 50: return None
+def calc_vwap(klines):
+    """Calculate Volume Weighted Average Price from klines."""
+    if len(klines) < 5: return 0
+    cum_tp_vol = 0
+    cum_vol = 0
+    for k in klines:
+        h, l, c, v = float(k[2]), float(k[3]), float(k[4]), float(k[5])
+        typical_price = (h + l + c) / 3
+        cum_tp_vol += typical_price * v
+        cum_vol += v
+    return cum_tp_vol / cum_vol if cum_vol > 0 else 0
+
+def detect_super_confluence(k_5m, k_15m):
+    """Enhanced 7-layer confluence: 15m HTF + 5m EMA + Supertrend + MACD + RSI(9) + BB + VWAP + Volume."""
+    if len(k_5m) < 50 or len(k_15m) < 55: return None
     
-    # 1. Macro Trend Filter (200 EMA, fallback to 50 EMA for new coins)
-    ema_val = calc_ema(klines[:-1], 200)
+    price = float(k_5m[-2][4])  # Last CLOSED 5m candle
+    
+    # === LAYER 1: Higher-Timeframe Trend (15m 50 EMA) ===
+    htf_ema = calc_ema(k_15m[:-1], 50)
+    if htf_ema == 0: return None
+    htf_price = float(k_15m[-2][4])
+    htf_bullish = htf_price > htf_ema
+    htf_bearish = htf_price < htf_ema
+    
+    # === LAYER 2: 5m Trend Filter (200 EMA, fallback to 50 EMA) ===
+    ema_val = calc_ema(k_5m[:-1], 200)
     if ema_val == 0:
-        ema_val = calc_ema(klines[:-1], 50)
+        ema_val = calc_ema(k_5m[:-1], 50)
         if ema_val == 0: return None
-        
-    price = float(klines[-2][4])
     
-    # 2. Supertrend
-    st_curr, st_prev = calc_supertrend(klines[:-1], 10, 3.0)
+    # === LAYER 3: Supertrend ===
+    st_curr, st_prev = calc_supertrend(k_5m[:-1], 10, 3.0)
     if not st_curr: return None
     
-    # 3. MACD Crossover
-    macd_curr, sig_curr, macd_prev, sig_prev = calc_macd(klines[:-1])
+    # === LAYER 4: MACD Crossover ===
+    macd_curr, sig_curr, macd_prev, sig_prev = calc_macd(k_5m[:-1])
     if macd_curr is None: return None
     
-    # 4. RSI filter (prevents buying the top / selling the bottom)
-    rsi_val = calc_rsi(klines[:-1], 14)
+    # === LAYER 5: RSI (9-period for fast 5m momentum reads) ===
+    rsi_val = calc_rsi(k_5m[:-1], 9)
     
-    # 5. Bollinger Bands position filter (ensures room to move)
-    upper, sma, lower = calc_bollinger_bands(klines[:-1], 20, 2)
+    # === LAYER 6: Bollinger Bands boundary ===
+    upper, sma, lower = calc_bollinger_bands(k_5m[:-1], 20, 2)
     if upper == 0 or lower == 0: return None
     
-    # LONG CONDITIONS
-    if price > ema_val and st_curr == 1:
-        if macd_prev < sig_prev and macd_curr > sig_curr:
-            if rsi_val < 65 and price < upper:
-                return "LONG"
-            
-    # SHORT CONDITIONS
-    if price < ema_val and st_curr == -1:
-        if macd_prev > sig_prev and macd_curr < sig_curr:
-            if rsi_val > 35 and price > lower:
-                return "SHORT"
-            
+    # === LAYER 7: VWAP alignment ===
+    vwap = calc_vwap(k_5m[-50:])
+    if vwap == 0: return None
+    
+    # === LAYER 8: Volume confirmation (must be above average) ===
+    vol_ratio = calc_volume_spike(k_5m[:-1], 20)
+    if vol_ratio < 1.2: return None  # Reject low-volume signals
+    
+    # ---- LONG CONDITIONS (ALL layers must agree) ----
+    if (htf_bullish                                       # 15m trend is UP
+        and price > ema_val                               # Price above 5m EMA
+        and st_curr == 1                                  # Supertrend is green
+        and macd_prev < sig_prev and macd_curr > sig_curr # MACD just crossed UP
+        and 40 < rsi_val < 65                             # RSI in sweet spot (not too low, not overbought)
+        and price < upper                                 # Below upper BB (room to grow)
+        and price > vwap):                                # Above VWAP (institutional buyers present)
+        return "LONG"
+    
+    # ---- SHORT CONDITIONS (ALL layers must agree) ----
+    if (htf_bearish                                       # 15m trend is DOWN
+        and price < ema_val                               # Price below 5m EMA
+        and st_curr == -1                                 # Supertrend is red
+        and macd_prev > sig_prev and macd_curr < sig_curr # MACD just crossed DOWN
+        and 35 < rsi_val < 60                             # RSI in sweet spot (not too high, not oversold)
+        and price > lower                                 # Above lower BB (room to drop)
+        and price < vwap):                                # Below VWAP (institutional sellers present)
+        return "SHORT"
+    
     return None
 
 def detect_ema_cross(klines):
@@ -346,13 +381,15 @@ def calc_order_flow_delta(klines, period=10):
             delta -= v
     return delta
 
-# --- Scanner Thread (Multi-Strategy, Zero AI tokens) ---
+# --- Scanner Thread (Multi-Timeframe Super Confluence) ---
 def market_scanner():
     global daily_pnl, daily_reset_date
     print("=" * 60)
-    print("🚀 MULTI-STRATEGY SCALPER v4.1 STARTED")
-    print("   Strategies: RSI | EMA Cross | Volume | BB+RSI Combo")
-    print("   Timeframe: 5m | Scan: 30s | Top 50 Volume Coins")
+    print("🚀 SUPER CONFLUENCE SCALPER v5.0 STARTED")
+    print("   Strategy: 7-Layer MTF Confluence (15m+5m)")
+    print("   Filters: EMA+Supertrend+MACD+RSI9+BB+VWAP+Volume")
+    print("   Dynamic Position Sizing | Fixed $1 Risk Per Trade")
+    print("   Min Liquidity: $50M | Max Concurrent: 2")
     print("=" * 60)
     scan_count = 0
     while True:
@@ -381,80 +418,84 @@ def market_scanner():
                 print(f"[Scan #{scan_count}] ⚠️ No Binance data. Retrying...")
                 time.sleep(10)
                 continue
-            # Filter for liquidity, then sort by highest volatility (Price Change % magnitude) to catch surging coins
-            valid_coins = [t for t in tickers if t.get("symbol","").endswith("USDT") and float(t.get("quoteVolume", 0)) > 15000000]
+            # HIGH LIQUIDITY ONLY: $50M+ daily volume to avoid getting trapped in illiquid garbage
+            valid_coins = [t for t in tickers if t.get("symbol","").endswith("USDT") and float(t.get("quoteVolume", 0)) > MIN_QUOTE_VOLUME]
             valid_coins.sort(key=lambda x: abs(float(x.get("priceChangePercent", 0))), reverse=True)
             signals_found = 0
             pending_signals = []
             
-            for t in valid_coins[:50]:
+            for t in valid_coins[:40]:
                 sym = t["symbol"]
                 if sym in active_trades: continue
                 if len(active_trades) >= MAX_CONCURRENT: break
+                
+                # Fetch BOTH timeframes for multi-timeframe analysis
                 k_5m = b_get("/fapi/v1/klines", {"symbol": sym, "interval": "5m", "limit": 100})
-                if not k_5m or not isinstance(k_5m, list) or len(k_5m) < 30: continue
-                price = float(k_5m[-1][4])
+                if not k_5m or not isinstance(k_5m, list) or len(k_5m) < 50: continue
+                
+                k_15m = b_get("/fapi/v1/klines", {"symbol": sym, "interval": "15m", "limit": 100})
+                if not k_15m or not isinstance(k_15m, list) or len(k_15m) < 55: continue
+                
+                price = float(k_5m[-2][4])  # Last CLOSED candle price
                 if price == 0: continue
+                
                 direction = None
                 strategy = ""
                 reason = ""
-                # STRATEGY 0: Super Confluence (MACD + Supertrend + 200 EMA)
-                super_sig = detect_super_confluence(k_5m)
+                
+                # STRATEGY: 7-Layer Super Confluence (15m + 5m)
+                super_sig = detect_super_confluence(k_5m, k_15m)
                 if super_sig:
                     direction = super_sig
                     strategy = "SUPER_CONFLUENCE"
-                    reason = "MACD + Supertrend + 200 EMA"
-                # STRATEGY 1: RSI Reversal
+                    reason = "MTF+EMA+ST+MACD+RSI9+BB+VWAP"
+                
+                # Legacy strategies (disabled when ENABLE_SUPER_CONFLUENCE_ONLY=True)
                 if not direction and not ENABLE_SUPER_CONFLUENCE_ONLY:
                     rsi_sig, rsi_val = detect_rsi_signal(k_5m)
                     if rsi_sig:
                         direction = rsi_sig
                         strategy = "RSI_REVERSAL"
                         reason = f"RSI {rsi_val:.0f} bounce"
-                # STRATEGY 2: EMA 9/21 Cross
                 if not direction and not ENABLE_SUPER_CONFLUENCE_ONLY:
                     ema_sig = detect_ema_cross(k_5m)
                     if ema_sig:
                         direction = ema_sig
                         strategy = "EMA_CROSS"
                         reason = f"EMA 9/21 {ema_sig}"
-                # STRATEGY 3: Volume Breakout
-                if not direction and not ENABLE_SUPER_CONFLUENCE_ONLY:
-                    vol_sig = detect_volume_breakout(k_5m)
-                    if vol_sig:
-                        direction = vol_sig
-                        strategy = "VOL_BREAKOUT"
-                        reason = f"Volume {calc_volume_spike(k_5m,20):.1f}x spike"
-                # STRATEGY 4: BB + RSI Combo
-                if not direction and not ENABLE_SUPER_CONFLUENCE_ONLY:
-                    bb_rsi_sig = detect_bb_rsi_combo(k_5m, rsi_val)
-                    if bb_rsi_sig:
-                        direction = bb_rsi_sig
-                        strategy = "BB_RSI_COMBO"
-                        reason = f"BB Breakout + RSI {rsi_val:.0f}"
+                
                 if direction:
-                    # HTF Trend Filter (only for legacy strategies; super confluence has built-in trend checks)
-                    if strategy != "SUPER_CONFLUENCE":
-                        ema_50 = calc_ema(k_5m, 50)
-                        if (direction == "LONG" and price < ema_50) or (direction == "SHORT" and price > ema_50):
-                            continue # Reject counter-trend trades
-                    
                     signals_found += 1
-                    atr = calc_atr(k_5m)
+                    atr = calc_atr(k_5m[:-1])  # ATR on closed candles only
                     if atr == 0: continue
-                    max_sl_pct = MAX_RISK_PER_TRADE / (MARGIN_PER_TRADE * DEFAULT_LEVERAGE)
-                    sl_dist = min(2.0 * atr, price * max_sl_pct)
-                    tp_dist = sl_dist * 2.0
+                    
+                    # --- DYNAMIC POSITION SIZING ---
+                    # SL = natural 2.0 * ATR distance (NO artificial cap)
+                    sl_dist = 2.0 * atr
                     if sl_dist == 0: continue
+                    
+                    # Calculate margin dynamically so risk is EXACTLY $1.0
+                    # Risk = margin * leverage * (sl_dist / price)
+                    # $1.0 = margin * 10 * (sl_dist / price)
+                    # margin = $1.0 / (10 * sl_dist / price) = price / (10 * sl_dist)
+                    dynamic_margin = MAX_RISK_PER_TRADE / (DEFAULT_LEVERAGE * (sl_dist / price))
+                    dynamic_margin = max(2.0, min(dynamic_margin, 10.0))  # Clamp: $2 to $10
+                    
+                    # Safety: ensure we have enough balance for this trade
+                    total_margin_used = sum(pos.get('margin', 5.0) for pos in active_trades.values())
+                    if total_margin_used + dynamic_margin > paper_wallet * 0.6:
+                        continue  # Don't use more than 60% of wallet
+                    
+                    tp_dist = sl_dist * 2.5  # Risk:Reward = 1:2.5
+                    
                     if direction == "LONG":
                         sl, tp = price - sl_dist, price + tp_dist
                     else:
                         sl, tp = price + sl_dist, price - tp_dist
                     
-                    # Add to batch verification list
                     pending_signals.append({
                         "symbol": sym, "side": direction, "strategy": strategy, "reason": reason,
-                        "price": price, "sl": sl, "tp": tp
+                        "price": price, "sl": sl, "tp": tp, "margin": round(dynamic_margin, 2)
                     })
                 live_radar[sym] = {"sweep": strategy or "SCANNING", "delta": 0, "prob": 0}
                 
@@ -463,22 +504,22 @@ def market_scanner():
             if pending_signals and max_new_trades > 0:
                 signals_text = ""
                 for idx, sig in enumerate(pending_signals):
-                    signals_text += f"{idx+1}. {sig['symbol']}: {sig['side']} setup based on {sig['strategy']} ({sig['reason']}). Price: {sig['price']}.\n"
+                    sl_pct = abs(sig['sl'] - sig['price']) / sig['price'] * 100
+                    signals_text += f"{idx+1}. {sig['symbol']}: {sig['side']} | Strategy: {sig['strategy']} | Price: {sig['price']} | SL: {sl_pct:.2f}% away | Margin: ${sig['margin']}\n"
                 
-                ai_prompt = f"""You are an expert crypto quant trader. I have the following potential scalp trade setups:
+                ai_prompt = f"""You are an expert crypto quant trader. I have the following potential scalp trade setups that passed a strict 7-layer confluence filter (15m trend + 5m EMA + Supertrend + MACD cross + RSI9 + Bollinger Bands + VWAP + Volume):
 {signals_text}
-Maximum concurrent new trades I can open right now is {max_new_trades}.
-Analyze these setups carefully. Output ONLY a valid JSON object (no markdown, no other text) with this structure:
+Maximum new trades I can open: {max_new_trades}.
+Pick ONLY the highest probability setup(s). Output ONLY a valid JSON object (no markdown, no text):
 {{
-  "approved": ["SYMBOL1", "SYMBOL2"],
+  "approved": ["SYMBOL1"],
   "reasons": {{
-    "SYMBOL1": "short reason why this is the highest probability setup",
-    "SYMBOL2": "short reason why this is the highest probability setup"
+    "SYMBOL1": "short reason"
   }}
 }}
-If none of the setups are safe or high probability, return "approved": []."""
+If none look safe, return "approved": []."""
                 
-                print(f"🧠 Asking AI to evaluate {len(pending_signals)} setups in a single batch call...")
+                print(f"🧠 AI evaluating {len(pending_signals)} setups...")
                 ai_response = call_gemini(ai_prompt, retries=2)
                 
                 try:
@@ -487,11 +528,10 @@ If none of the setups are safe or high probability, return "approved": []."""
                     approved_symbols = data.get("approved", [])
                     reasons = data.get("reasons", {})
                 except Exception as e:
-                    print(f"⚠️ Failed to parse batch AI response: {e}. Raw: {ai_response.strip()[:150]}")
+                    print(f"⚠️ Failed to parse AI response: {e}. Raw: {ai_response.strip()[:150]}")
                     approved_symbols = []
                     reasons = {}
                 
-                # Execute approved trades
                 opened_count = 0
                 for sym in approved_symbols:
                     if opened_count >= max_new_trades: break
@@ -504,22 +544,22 @@ If none of the setups are safe or high probability, return "approved": []."""
                     active_trades[sym] = {
                         "id": trade_id, "symbol": sym, "side": sig["side"],
                         "entry": sig["price"], "sl": sig["sl"], "tp": sig["tp"],
-                        "margin": MARGIN_PER_TRADE, "leverage": DEFAULT_LEVERAGE,
+                        "margin": sig["margin"], "leverage": DEFAULT_LEVERAGE,
                         "prob": 0, "ai_reason": f"[{sig['strategy']}] {ai_reason}",
                         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     save_data()
-                    print(f"🎯 ENTRY (BATCH APPROVED): {sig['side']} {sym} @ {sig['price']:.4f} | {sig['strategy']} | {ai_reason}")
+                    print(f"🎯 ENTRY: {sig['side']} {sym} @ {sig['price']:.6f} | Margin: ${sig['margin']} | {ai_reason}")
                     opened_count += 1
                     
             if scan_count % 5 == 0:
-                print(f"[Scan #{scan_count}] Signals Found: {signals_found} | Active: {len(active_trades)}/{MAX_CONCURRENT}")
-            # Calculate time to sleep until next 5m candle close (+5s buffer)
+                print(f"[Scan #{scan_count}] Signals: {signals_found} | Active: {len(active_trades)}/{MAX_CONCURRENT} | Wallet: ${paper_wallet:.2f}")
+            # Wait until next 5m candle close (+5s buffer)
             now = time.time()
             sleep_time = 300 - (now % 300) + 5
             if sleep_time < 30:
                 sleep_time += 300
-            print(f"💤 Scan #{scan_count} completed. Waiting {int(sleep_time)}s for the next candle close...")
+            print(f"💤 Scan #{scan_count} done. Next candle in {int(sleep_time)}s...")
             time.sleep(sleep_time)
         except Exception as e:
             print(f"Scanner Error: {e}")
