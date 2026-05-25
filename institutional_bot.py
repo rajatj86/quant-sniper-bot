@@ -70,11 +70,11 @@ def rotate_gemini_model():
 # --- Professional Intraday Settings ---
 INITIAL_BALANCE = 50.0
 DEFAULT_LEVERAGE = 10      # 10x leverage
-MAX_CONCURRENT = 2         # Max 2 trades at once (quality > quantity)
-MAX_RISK_PER_TRADE = 1.0   # Fixed $1 risk per trade (position size adapts)
+MAX_CONCURRENT = 3         # Max 3 trades at once (increased from 2)
+MAX_RISK_PER_TRADE = 1.0   # Fixed $1 risk per trade
 DAILY_LOSS_LIMIT = 3.0     # HARD STOP for the day
 DAILY_PROFIT_TARGET = 10.0  # Lock in profits at $10.00
-MIN_QUOTE_VOLUME = 50_000_000  # Only trade coins with $50M+ daily volume
+MIN_QUOTE_VOLUME = 30_000_000  # Only trade coins with $30M+ daily volume (lowered from $50M)
 ENABLE_SUPER_CONFLUENCE_ONLY = True  # Strict high-win rate trading only
 
 # Global State
@@ -429,7 +429,7 @@ def market_scanner():
             signals_found = 0
             pending_signals = []
             
-            for t in valid_coins[:40]:
+            for t in valid_coins[:60]:
                 sym = t["symbol"]
                 if sym in active_trades: continue
                 if len(active_trades) >= MAX_CONCURRENT: break
