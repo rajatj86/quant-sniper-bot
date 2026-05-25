@@ -1011,6 +1011,26 @@ HTML = """
         document.getElementById('aiModal').style.display = 'none';
     }
 
+    async function closeTrade(symbol) {
+        if(!confirm(symbol + ' trade ko manually close karna chahte hain?')) return;
+        try {
+            const res = await fetch('/api/close_trade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol: symbol })
+            });
+            const data = await res.json();
+            if(data.status === 'success') {
+                alert(symbol + ' trade successfully close ho gayi! PNL: $' + data.pnl.toFixed(2));
+                fetchData();
+            } else {
+                alert('Error closing trade: ' + data.message);
+            }
+        } catch(e) {
+            alert('Error connecting to server to close trade.');
+        }
+    }
+
     async function analyzeAnyCoin() {
         let sym = document.getElementById('tvSymbol').value.toUpperCase().trim();
         if(!sym) { alert('Pehle coin name dalo!'); return; }
@@ -1093,6 +1113,7 @@ HTML = """
                     <td class="${pnl >= 0 ? 'col-green' : 'col-red'} fw-bold">$${pnlStr}</td>
                     <td>
                         <button class="btn-ai" onclick="analyzeTrade('${t.id}')" style="margin-right: 4px;"><i class="fa-solid fa-robot"></i> AI</button>
+                        <button class="btn-ai" onclick="closeTrade('${t.symbol}')" style="background: linear-gradient(45deg, #ff1744, #ff5252); margin-right: 4px;"><i class="fa-solid fa-circle-xmark"></i> Close</button>
                         <button class="btn-ai" onclick="document.getElementById('tvSymbol').value='${t.symbol}'; changeChart(); var tab = new bootstrap.Tab(document.getElementById('research-tab')); tab.show();" style="background: linear-gradient(45deg, #00b0ff, #00e5ff);"><i class="fa-solid fa-chart-line"></i> Chart</button>
                     </td>
                 </tr>`;
@@ -1177,6 +1198,34 @@ def toggle_bot():
     global bot_running
     bot_running = not bot_running
     return jsonify({"bot_running": bot_running})
+
+@app.route('/api/close_trade', methods=['POST'])
+def close_trade():
+    global paper_wallet, daily_pnl
+    data = request.json
+    sym = data.get('symbol')
+    if sym in active_trades:
+        pos = active_trades[sym]
+        single = b_get("/fapi/v1/ticker/price", {"symbol": sym})
+        curr_price = float(single['price']) if (single and 'price' in single) else pos['entry']
+        
+        final_diff = (curr_price - pos['entry']) / pos['entry']
+        if pos['side'] == "SHORT": final_diff = -final_diff
+        final_pnl = pos['margin'] * pos['leverage'] * final_diff
+        
+        paper_wallet += final_pnl
+        daily_pnl += final_pnl
+        pos['exit_price'] = curr_price
+        pos['pnl'] = final_pnl
+        pos['reason'] = "MANUAL_CLOSE"
+        pos['exit_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        trade_history.insert(0, pos)
+        del active_trades[sym]
+        save_data()
+        print(f"TRADE CLOSED MANUALLY: {sym} | PNL: ${final_pnl:.2f}")
+        return jsonify({"status": "success", "pnl": final_pnl})
+    return jsonify({"status": "error", "message": "Trade not found"}), 404
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_trade():
